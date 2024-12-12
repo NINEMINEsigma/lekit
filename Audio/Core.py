@@ -1,6 +1,6 @@
 import sounddevice as base
 import soundfile as sf
-from File.tool_file import tool_file
+from File.Core import tool_file
 
 def load_audio(file_path):
     sf.load

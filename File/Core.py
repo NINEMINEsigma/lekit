@@ -7,27 +7,33 @@ from pydub import AudioSegment
 from PIL import Image
 
 audio_file_type = ["mp3","ogg","wav"]
-image_file_type = ('.png', '.jpg', '.jpeg', '.bmp', '.svg', '.ico')
+image_file_type = ['png', 'jpg', 'jpeg', 'bmp', 'svg', 'ico']
 
-def is_binary_file(file_path: str, test_length:int=1024) -> bool:
+is_binary_file_functional_test_length:int = 1024
+
+def is_binary_file(file_path: str) -> bool:
     try:
+        global is_binary_file_functional_test_length
         with open(file_path, 'rb') as f:
-            chunk = f.read(test_length)  # 读取文件的前缀字节
+            chunk = f.read(is_binary_file_functional_test_length)  # 读取文件的前缀字节
             return b'\x00' in chunk  # 如果包含NUL字符，则认为是二进制文件
     except Exception as e:
         print(f"Error: {e}")
         return False
     
-def is_image_file(file_path:str):
-    return file_path.lower().endswith(image_file_type)
-    
 def get_extension_name(file:str):
         return os.path.splitext(file)[1][1:]
+    
+def is_image_file(file_path:str):
+    return get_extension_name(file_path) in image_file_type
 
 class tool_file:
-    def __init__(self, file_path:str):
+    def __init__(self, file_path:str, file_mode:str=None):
         self.__file_path = file_path
-        self.__file = None
+        if file_mode is None:
+            self.__file = None
+        else:
+            self.open(file_mode)
     def __del__(self):
         self.close()
         
