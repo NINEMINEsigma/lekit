@@ -12,7 +12,10 @@ def limit_str(data, max_length=50):
         
         # 截取头尾部分并连接
         return s[:head_length] + inside_str + s[-tail_length:]
-    
+
+def link(symbol:str, strs:list):
+    return symbol.join(strs)
+
 class light_str:
     def __init__(self, s:str=""):
         self._str = s

@@ -1,10 +1,15 @@
 import json
 import csv
 import xml.etree.ElementTree as ET
-import pandas as pd
 import os
+import sys
+
 from pydub import AudioSegment
+
 from PIL import Image
+
+from docx import Document
+from docx.document import Document as DocumentObject
 
 audio_file_type = ["mp3","ogg","wav"]
 image_file_type = ['png', 'jpg', 'jpeg', 'bmp', 'svg', 'ico']
@@ -36,6 +41,8 @@ class tool_file:
             self.open(file_mode)
     def __del__(self):
         self.close()
+    def __str__(self):
+        return self.get_path()
         
     def create(self):
         if self.exists() == False:
@@ -74,6 +81,10 @@ class tool_file:
             self.load_as_xml()
         elif suffix == 'xlsx' or suffix == 'xls':
             self.load_as_excel()
+        elif suffix == 'txt':
+            self.load_as_text()
+        elif suffix == 'docx':
+            self.load_as_docx()
         elif suffix in audio_file_type:
             self.load_as_audio()
         elif is_binary_file(self.__file_path):
@@ -120,6 +131,9 @@ class tool_file:
     def load_as_image(self):
         self.data = Image.open(self.__file_path)
         return self.data
+    def load_as_docx(self):
+        self.data = Document(self.__file_path)
+        return self.data
 
     def save(self, path:str=None):
         suffix = self.get_extension(path)
@@ -131,6 +145,10 @@ class tool_file:
             self.save_as_xml(path)
         elif suffix == 'xlsx' or suffix == 'xls':
             self.save_as_excel(path)
+        elif suffix == 'txt':
+            self.save_as_text(path)
+        elif suffix == 'docx':
+            self.save_as_docx(path)
         elif suffix in audio_file_type:
             self.save_as_audio(path, suffix)
         elif is_binary_file(self.__file_path):
@@ -193,6 +211,13 @@ class tool_file:
     def save_as_image(self, path:str):
         self.data.save(path if path else self.__file_path)
         return self
+    def save_as_docx(self, path:str):
+        if self.data is str:
+            self.data = Document()
+            table = self.data.add_table(rows=1, cols=1)
+            table.cell(0, 0).text = self.data
+        self.data.save(path if path else self.__file_path)
+        return self
     
     def get_data_type(self):
         return type(self.data)
@@ -201,6 +226,8 @@ class tool_file:
         return get_extension_name(path)
     def get_path(self):
         return self.__file_path
+    def get_filename(self):
+        return os.path.basename(self.__file_path)
     
     def is_dir(self):
         return os.path.isdir(self.__file_path)
@@ -217,4 +244,13 @@ class tool_file:
             os.makedirs(dir_path)
     def dir_iter(self):
         return os.listdir(self.__file_path)
+    
+    def append_text(self, line:str):
+        if self.data is str:
+            self.data = self.data + line
+        elif self.data is DocumentObject:
+            self.data.add_paragraph(line)
+        else:
+            raise TypeError(f"Unsupported data type for {sys._getframe().f_code.co_name}")
+        return self
     
