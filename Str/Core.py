@@ -1,4 +1,7 @@
+from typing import *
+from lekit.Lang.Reflection import light_reflection
 
+from lekit.File.Core import tool_file
 
 def limit_str(data, max_length=50):
     s:str = data if data is str else str(data)
@@ -67,3 +70,31 @@ class light_str:
     
     def __str__(self):
         return self._str
+
+def UnWrapper(from_) -> str:
+    if isinstance(from_, str):
+        return from_
+    elif isinstance(from_, tool_file):
+        return from_.get_path()
+    
+    ReEx = light_reflection(from_)
+    if ReEx.contains_method("to_string"):
+        return from_.to_string()
+    elif ReEx.contains_method("__str__"):
+        return str(from_)
+    else:
+        raise ValueError("Unsupport instance")
+    
+def Able_UnWrapper(from_) -> bool:
+    if isinstance(from_, str):
+        return True
+    elif isinstance(from_, tool_file):
+        return True
+    
+    ReEx = light_reflection(from_)
+    if ReEx.contains_method("to_string"):
+        return True
+    elif ReEx.contains_method("__str__"):
+        return True
+    else:
+        raise False

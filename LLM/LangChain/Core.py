@@ -1,53 +1,150 @@
-from langchain.agents import Tool, AgentExecutor, initialize_agent
-from langchain.chains.llm import LLMChain
-import langchain_llama
-from langchain_community.embeddings import LlamaCppEmbeddings
-from langchain.prompts.prompt import PromptTemplate
+from langchain_community.chat_models    import *
+from typing                             import *
+from lekit.Str.Core                     import UnWrapper
+from lekit.File.Core                    import tool_file
+from lekit.Lang.CppLike                 import *
 
-def search_restaurant(cuisine: str, location: str, price: str) -> str:
-    """根据菜系、地点和价格范围搜索餐厅。"""
-    #  这里可以调用第三方 API 或数据库进行实际的餐厅搜索
-    #  为了演示，我们直接返回模拟结果
-    return f"已找到以下{cuisine}餐厅：餐厅 A ({price})、餐厅 B ({price})"
+from langchain_core.language_models.base    import *
+from langchain_core.prompts                 import ChatPromptTemplate
 
-def get_restaurant_details(restaurant_name: str) -> str:
-    """获取餐厅的详细信息，如评分、地址、营业时间等。"""
-    #  这里可以调用第三方 API 或数据库进行实际的信息获取
-    #  为了演示，我们直接返回模拟结果
-    return f"{restaurant_name}：评分 4.5 分，地址：XX 路 XX 号，营业时间：10:00-22:00"
+MessageObject = LanguageModelInput
+MessageType = Literal[
+    "human", 
+    "user",
+    "ai",
+    "assistant",
+    "system", 
+    "function",
+    "tool"
+    ]
 
+def do_make_content(**kwargs) -> MessageObject:
+    result:Dict[str,str]={}
+    for key in kwargs:
+        result[key] = str(kwargs[key])
+    return result
+def make_content(role:MessageType, content:str):
+    return do_make_content(role=role, content=content)
+def make_system_prompt(prompt:str):
+    return make_content('system', prompt)
+def make_human_prompt(message:str):
+    return make_content('human', message)
+def make_assistant_prompt(message:str):
+    return make_content('assistant', message)
+
+class abs_core(ABC):
+    @abstractmethod
+    def __call__(self, message:str) -> BaseMessage:
+        return None
+
+class light_llama_core:
+    def __init__(self,
+                 model:         Union[str, tool_file, ChatLlamaCpp],
+                 init_message:  Union[MessageObject, List[MessageObject]]   = []
+                 ):
+        if isinstance(init_message, List) is False:
+            if isinstance(init_message, str):
+                init_message = make_system_prompt(init_message)
+            else:
+                init_message = [init_message]
+        if isinstance(model, ChatLlamaCpp) is False:
+            model = ChatLlamaCpp(model_path=UnWrapper(model))
+        self.init_message_list      :List[MessageObject]    = init_message
+        self.hestroy_message_list   :List[MessageObject]    = self.init_message_list
+        self.model                  :ChatLlamaCpp           = model
+        self.last_result            :BaseMessage            = None
+        
+    def __str__(self):
+        return str(self.hestroy_message_list)
+    def __call__(self, message:str):
+        self.hestroy_message_list.append(make_human_prompt(message))
+        result = self.model.invoke(self.hestroy_message_list)
+        self.hestroy_message_list.append(make_assistant_prompt(result.content))
+        self.last_result = result
+        return result
+    
+    def clear_hestroy(self):
+        self.hestroy_message_list = self.init_message_list
+        return self
+    def pop_hestroy(self):
+        result = self.hestroy_message_list.pop()
+        return result
+    def get_hestroy(self):
+        return self.hestroy_message_list
+    def set_hestroy(self, message:List[MessageObject]):
+        self.hestroy_message_list = message
+    def get_last_message(self):
+        return self.hestroy_message_list[-1]
+    def append_message(self, message:MessageObject):
+        self.hestroy_message_list.append(message)
+        return self
+
+    def save_hestroy(self, file:Union[tool_file,str]):
+        if isinstance(file, tool_file) is False:
+            file = tool_file(UnWrapper(file))
+            file.open('wb')
+        file.data = self.hestroy_message_list
+        
+class light_prompt:
+    '''
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are a helpful assistant that translates {input_language} to {output_language}.",
+            ),
+            (
+                "human", 
+                "{input}"
+            ),
+        ]
+    )
+
+    ...
+
+    chain = prompt | llm
+    chain.invoke(
+        {
+            "input_language": "English",
+            "output_language": "German",
+            "input": "I love programming.",
+        }
+    )
+    '''
+    def __init__(self):
+        self.prompt:List[BaseMessage] = []
+        
+    def from_single_chat(self, system_format_prompt:str, human_format_asker:str):
+        self.prompt.append(ChatPromptTemplate.from_messages(make_list(
+            make_system_prompt(system_format_prompt),
+            make_human_prompt(human_format_asker)
+        )))
+        return self
+    
+    def __call__(self, system_format_prompt:str, human_format_asker:str):
+        return self.from_single_chat(system_format_prompt,human_format_asker)
+    
+    def invork(self, )
+    
+    
 if __name__ == '__main__':
     # 设置模型路径
-    llama = LlamaCppEmbeddings(model_path='''D:\LLM\MODELs\llama3-8B\Meta-Llama-3-8B-Instruct\Meta-Llama-3-8B-Instruct-Q4_0.gguf''')
-    text = "This is a test document."
-
-    # 查询嵌入
-    query_result = llama.embed_query(text)
-    print("Query Embedding:", query_result)
+    model_path=r'D:\LLM\MODELs\llama3-8B\Meta-Llama-3-8B-Instruct\Meta-Llama-3-8B-Instruct-Q4_0.gguf'
     
-    # 文档嵌入
-    doc_result = llama.embed_documents([text])
-    print("Document Embedding:", doc_result)
-    #llm = langchain_llama.(model="gpt-4", temperature=0)
-    #
-    #prompt_template = """
-    #你是一位智能餐厅推荐助手，你需要根据用户的需求，推荐合适的餐厅。
-    #你可以使用以下工具：
-    #- search_restaurant: 搜索餐厅，参数：菜系，地点，价格范围
-    #- get_restaurant_details: 获取餐厅详细信息，参数：餐厅名称
-    #
-    #以下是用户的需求：
-    #{user_request}
-    #
-    #请根据用户的需求，给出你的建议，并调用相应的工具获取必要的信息。
-    #"""
-    #
-    #prompt = PromptTemplate(template=prompt_template, input_variables=["user_request"])
-    #llm_chain = LLMChain(llm=llm, prompt=prompt)
-    #
-    #tools = [search_restaurant, get_restaurant_details]
-    #agent = initialize_agent(tools, llm_chain, agent="zero-shot-react-description", verbose=True)
-    #
-    ## Test
-    #user_request = "我想在周五晚上和朋友一起去吃湘菜，最好环境优雅，人均消费在 150 元左右。"
-    #agent.run(user_request)
+    llm = light_llama_core(
+        model=model_path,
+        init_message=[make_system_prompt("You are a helpful assistant that translates English to Chinese. Translate the user sentence.")]
+    )
+    result = llm(r"What is the time now.")
+    print("result:")
+    print(result.content)
+    print("llm hestroy:")
+    print(llm.hestroy_message_list)
+    
+    print()
+    
+    result = llm(r"I am human.")
+    print("result:")
+    print(result.content)
+    print("llm hestroy:")
+    print(llm.hestroy_message_list)

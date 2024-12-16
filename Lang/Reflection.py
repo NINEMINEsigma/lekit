@@ -30,24 +30,24 @@ class light_reflection:
         """获取对象的所有方法"""
         return {method: getattr(self.obj, method) for method in dir(self.obj) if callable(getattr(self.obj, method)) and not method.startswith("__")}
 
-    def has_attribute(self, attr_name):
+    def contains_attribute(self, attr_name):
         """检查对象是否具有某个属性"""
         return hasattr(self.obj, attr_name)
 
-    def has_method(self, method_name):
+    def contains_method(self, method_name):
         """检查对象是否具有某个方法"""
         return hasattr(self.obj, method_name) and callable(getattr(self.obj, method_name))
 
     def call_method(self, method_name, *args, **kwargs):
         """调用对象的方法"""
-        if self.has_method(method_name):
+        if self.contains_method(method_name):
             return getattr(self.obj, method_name)(*args, **kwargs)
         else:
             raise AttributeError(f"{self.obj.__class__.__name__} object has no method '{method_name}'")
 
     def set_attribute(self, attr_name, value):
         """设置对象的属性值"""
-        if self.has_attribute(attr_name):
+        if self.contains_attribute(attr_name):
             setattr(self.obj, attr_name, value)
         else:
             raise AttributeError(f"{self.obj.__class__.__name__} object has no attribute '{attr_name}'")
@@ -56,7 +56,7 @@ class light_reflection:
 
     def get_attribute(self, attr_name):
         """获取对象的属性值"""
-        if self.has_attribute(attr_name):
+        if self.contains_attribute(attr_name):
             return getattr(self.obj, attr_name)
         else:
             raise AttributeError(f"{self.obj.__class__.__name__} object has no attribute '{attr_name}'")
