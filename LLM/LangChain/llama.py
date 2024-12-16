@@ -6,6 +6,9 @@ from lekit.Lang.CppLike                 import *
 
 from langchain_core.language_models.base    import *
 from langchain_core.prompts                 import ChatPromptTemplate
+from langchain_core.messages.utils          import convert_to_messages
+
+from lekit.LLM.LangChain.AbsInterface   import abs_llm_core, abs_llm_callable
 
 MessageObject = LanguageModelInput
 MessageType = Literal[
@@ -32,12 +35,7 @@ def make_human_prompt(message:str):
 def make_assistant_prompt(message:str):
     return make_content('assistant', message)
 
-class abs_core(ABC):
-    @abstractmethod
-    def __call__(self, message:str) -> BaseMessage:
-        return None
-
-class light_llama_core:
+class light_llama_core(abs_llm_core):
     def __init__(self,
                  model:         Union[str, tool_file, ChatLlamaCpp],
                  init_message:  Union[MessageObject, List[MessageObject]]   = []
@@ -56,6 +54,7 @@ class light_llama_core:
         
     def __str__(self):
         return str(self.hestroy_message_list)
+    @override
     def __call__(self, message:str):
         self.hestroy_message_list.append(make_human_prompt(message))
         result = self.model.invoke(self.hestroy_message_list)
@@ -73,19 +72,44 @@ class light_llama_core:
         return self.hestroy_message_list
     def set_hestroy(self, message:List[MessageObject]):
         self.hestroy_message_list = message
+    def append_hestroy(self, message:MessageObject):
+        self.hestroy_message_list.append(message)
+        return self
+    @override
+    def save_hestroy(self, file:Union[tool_file,str]):
+        if isinstance(file, tool_file) is False:
+            file = tool_file(UnWrapper(file))
+            file.open('wb')
+        file.data = self.hestroy_message_list
+    @override
+    def load_hestory(self, file:Union[tool_file,str]):
+        if isinstance(file, tool_file) is False:
+            file = tool_file(UnWrapper(file))
+        if file.exists() is False:
+            raise FileExistsError(f"{file.get_path()} is not found")
+        file.open('rb')
+        file.refresh()
+        self.hestroy_message_list = file.data
+    
     def get_last_message(self):
         return self.hestroy_message_list[-1]
     def append_message(self, message:MessageObject):
         self.hestroy_message_list.append(message)
         return self
 
-    def save_hestroy(self, file:Union[tool_file,str]):
-        if isinstance(file, tool_file) is False:
-            file = tool_file(UnWrapper(file))
-            file.open('wb')
-        file.data = self.hestroy_message_list
+class light_llama_prompt_core(Callable[[dict], BaseMessage]):
+    def __init__(self, core:light_llama_core, prompt:ChatPromptTemplate):
+        self.core:          light_llama_core    = core
+        self.prompt:        ChatPromptTemplate  = prompt
+        self.last_result:   BaseMessage         = None
         
-class light_prompt:
+    @override
+    def __call__(self, message_inserter:dict) -> BaseMessage:
+        chain = self.prompt|self.core
+        self.last_result = chain.invoke(message_inserter)
+        return self.last_result.content
+        
+class light_llama_prompt(Callable[[str, str], object]):
     '''
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -112,19 +136,20 @@ class light_prompt:
     )
     '''
     def __init__(self):
-        self.prompt:List[BaseMessage] = []
+        self.prompt:List[MessageLikeRepresentation] = []
         
-    def from_single_chat(self, system_format_prompt:str, human_format_asker:str):
-        self.prompt.append(ChatPromptTemplate.from_messages(make_list(
-            make_system_prompt(system_format_prompt),
-            make_human_prompt(human_format_asker)
-        )))
+    def from_single_chat(self, role:MessageType, message_format:str):
+        self.prompt.append((role,message_format))
         return self
     
-    def __call__(self, system_format_prompt:str, human_format_asker:str):
-        return self.from_single_chat(system_format_prompt,human_format_asker)
+    def __call__(self, role:MessageType, message_format:str):
+        return self.from_single_chat(role,message_format)
     
-    def invork(self, )
+    def invoke(self, core:light_llama_core):
+        return light_llama_prompt_core(
+            core, 
+            ChatPromptTemplate.from_messages(self.prompt)
+            )
     
     
 if __name__ == '__main__':
@@ -135,16 +160,22 @@ if __name__ == '__main__':
         model=model_path,
         init_message=[make_system_prompt("You are a helpful assistant that translates English to Chinese. Translate the user sentence.")]
     )
-    result = llm(r"What is the time now.")
-    print("result:")
-    print(result.content)
-    print("llm hestroy:")
-    print(llm.hestroy_message_list)
-    
+    prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are a helpful assistant that translates {input_language} to {output_language}.",
+        ),
+        ("human", "{input}"),
+    ]
+)
+
+    chain = prompt | llm.model
     print()
-    
-    result = llm(r"I am human.")
-    print("result:")
-    print(result.content)
-    print("llm hestroy:")
-    print(llm.hestroy_message_list)
+    print(chain.invoke(
+        {
+            "input_language": "English",
+            "output_language": "Chinese",
+            "input": "I love programming.",
+        }
+    ).content)
