@@ -1,3 +1,4 @@
+from types import NoneType
 from typing import *
 from lekit.Str.Core import UnWrapper
 
@@ -35,3 +36,31 @@ def make_map(*args, **kwargs) -> Dict[str, Any]:
     for key in kwargs:
         result[UnWrapper(key)] = kwargs[key]
     return result
+
+# LightDiagram::ld::instance<_Ty>
+class ld_instance:
+    def __init__(self, target, *, constructor_func:Callable[[object], NoneType]=None, destructor_func:Callable[[object], NoneType]=None):
+        self.target = target
+        if constructor_func:
+            constructor_func(self.target)
+        self.destructor_func = destructor_func
+    def __del__(self):
+        if self.destructor_func:
+            self.destructor_func(self.target)
+    def __getitem__(self, key):
+        return self.target[key]
+    def __setitem__(self, key, value):
+        self.target[key] = value
+    def __delitem__(self, key):
+        del self.target[key]
+    def __iter__(self):
+        return iter(self.target)
+    def __len__(self):
+        return len(self.target)
+    def __contains__(self, key):
+        return key in self.target
+    def __str__(self):
+        return str(self.target)
+    
+    def get_ref(self):
+        return self.target

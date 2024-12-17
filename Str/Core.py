@@ -1,7 +1,6 @@
-from typing import *
-from lekit.Lang.Reflection import light_reflection
-
-from lekit.File.Core import tool_file
+from typing                         import *
+from lekit.Lang.Reflection          import light_reflection
+from lekit.File.Core                import tool_file
 
 def limit_str(data, max_length=50):
     s:str = data if data is str else str(data)

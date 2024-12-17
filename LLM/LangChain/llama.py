@@ -22,6 +22,9 @@ MessageType = Literal[
     ]
 
 def do_make_content(**kwargs) -> MessageObject:
+    if len(kwargs) == 2 and "role" in kwargs and "content" in kwargs:
+        return (kwargs['role'], kwargs['content'])
+    
     result:Dict[str,str]={}
     for key in kwargs:
         result[key] = str(kwargs[key])
@@ -97,19 +100,19 @@ class light_llama_core(abs_llm_core):
         self.hestroy_message_list.append(message)
         return self
 
-class light_llama_prompt_core(Callable[[dict], BaseMessage]):
+class runnable_llama_prompt_call(Callable[[dict], BaseMessage]):
     def __init__(self, core:light_llama_core, prompt:ChatPromptTemplate):
-        self.core:          light_llama_core    = core
-        self.prompt:        ChatPromptTemplate  = prompt
-        self.last_result:   BaseMessage         = None
+        self.core:          light_llama_core                        = core
+        self.prompt:        ChatPromptTemplate                      = prompt
+        self.last_result:   BaseMessage                             = None
+        self.chain:         RunnableSerializable[dict, BaseMessage] = self.prompt|self.core.model
         
     @override
     def __call__(self, message_inserter:dict) -> BaseMessage:
-        chain = self.prompt|self.core
-        self.last_result = chain.invoke(message_inserter)
+        self.last_result = self.chain.invoke(message_inserter)
         return self.last_result.content
         
-class light_llama_prompt(Callable[[str, str], object]):
+class light_llama_prompt(Callable[[light_llama_core], object]):
     '''
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -135,18 +138,25 @@ class light_llama_prompt(Callable[[str, str], object]):
         }
     )
     '''
-    def __init__(self):
-        self.prompt:List[MessageLikeRepresentation] = []
+    def __init__(self, core:light_llama_core=None):
+        self.prompt:    List[Tuple[str, str]]           = []
+        self.core:      light_llama_core                = core
         
     def from_single_chat(self, role:MessageType, message_format:str):
-        self.prompt.append((role,message_format))
+        self.prompt.append((role, message_format))
         return self
     
-    def __call__(self, role:MessageType, message_format:str):
-        return self.from_single_chat(role,message_format)
+    def append(self, role:MessageType, message_format:str, /):
+        return self.from_single_chat(role, message_format)
+    def __or__(self, role:MessageType, message_format:str, /):
+        return self.from_single_chat(role, message_format)
     
-    def invoke(self, core:light_llama_core):
-        return light_llama_prompt_core(
+    def __call__(self, core:light_llama_core=None):
+        if core is None:
+            core = self.core
+        if core is None:
+            raise Exception("core is None")
+        return runnable_llama_prompt_call(
             core, 
             ChatPromptTemplate.from_messages(self.prompt)
             )
@@ -156,26 +166,23 @@ if __name__ == '__main__':
     # 设置模型路径
     model_path=r'D:\LLM\MODELs\llama3-8B\Meta-Llama-3-8B-Instruct\Meta-Llama-3-8B-Instruct-Q4_0.gguf'
     
-    llm = light_llama_core(
+    llm:                light_llama_core            = light_llama_core(
         model=model_path,
         init_message=[make_system_prompt("You are a helpful assistant that translates English to Chinese. Translate the user sentence.")]
     )
-    prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            "You are a helpful assistant that translates {input_language} to {output_language}.",
-        ),
-        ("human", "{input}"),
-    ]
-)
-
-    chain = prompt | llm.model
-    print()
-    print(chain.invoke(
+    prompt_template:    light_llama_prompt          = light_llama_prompt(llm).append(
+        "system", "You are a helpful assistant that translates {input_language} to {output_language}.").append(
+        "human", "{input}")
+    callable_temp = prompt_template()
+    result = callable_temp(
         {
             "input_language": "English",
             "output_language": "Chinese",
             "input": "I love programming.",
         }
-    ).content)
+    )
+    print()
+    print("result.content:")
+    print(result)
+    print("result:")
+    print(callable_temp.last_result)
