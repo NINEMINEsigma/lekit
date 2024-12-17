@@ -4,12 +4,12 @@ import xml.etree.ElementTree as ET
 import os
 import sys
 
-from pydub import AudioSegment
-
-from PIL import Image
-
-from docx import Document
-from docx.document import Document as DocumentObject
+from typing                     import *
+from pydub                      import AudioSegment
+from PIL                        import Image
+from docx                       import Document
+from docx.document              import Document as DocumentObject
+from lekit.LLM.LangChain.llama  import light_llama_core
 
 audio_file_type = ["mp3","ogg","wav"]
 image_file_type = ['png', 'jpg', 'jpeg', 'bmp', 'svg', 'ico']
@@ -33,8 +33,12 @@ def is_image_file(file_path:str):
     return get_extension_name(file_path) in image_file_type
 
 class tool_file:
+    
+    datas_lit_key = Literal["model"]
+    
     def __init__(self, file_path:str, file_mode:str=None):
-        self.__file_path = file_path
+        self.__file_path:   str             = file_path
+        self.datas:         Dict[str,Any]   = {}
         if file_mode is None:
             self.__file = None
         else:
@@ -43,6 +47,18 @@ class tool_file:
         self.close()
     def __str__(self):
         return self.get_path()
+    def __setitem__(self, key:str, value):
+        self.datas[key] = value
+    def __getitem__(self, key:str):
+        return self.datas[key]
+    def __contains__(self, key:str):
+        return key in self.datas
+    def __delitem__(self, key:str):
+        del self.datas[key]
+    def __iter__(self):
+        return iter(self.datas)
+    def __len__(self):
+        return len(self.datas)
         
     def create(self):
         if self.exists() == False:
@@ -67,6 +83,8 @@ class tool_file:
     def close(self):
         if self.__file:
             self.__file.close()
+        if "model" in self.datas:
+            self.datas["model"] = None
         return self.__file
     def is_open(self)->bool:
         return self.__file
@@ -85,6 +103,8 @@ class tool_file:
             self.load_as_text()
         elif suffix == 'docx':
             self.load_as_docx()
+        elif suffix == 'gguf':
+            self.load_as_gguf()
         elif suffix in audio_file_type:
             self.load_as_audio()
         elif is_binary_file(self.__file_path):
@@ -134,6 +154,13 @@ class tool_file:
     def load_as_docx(self):
         self.data = Document(self.__file_path)
         return self.data
+    def load_as_gguf(self):
+        if 'llama' in self.__file_path.lower():
+            self.data = light_llama_core(self)
+            self.datas["model"] = self.data
+        else:
+            raise Exception('Unsupported model type')
+        return self.data
 
     def save(self, path:str=None):
         suffix = self.get_extension(path)
@@ -149,6 +176,8 @@ class tool_file:
             self.save_as_text(path)
         elif suffix == 'docx':
             self.save_as_docx(path)
+        elif suffix == 'gguf':
+            self.save_as_gguf(path)
         elif suffix in audio_file_type:
             self.save_as_audio(path, suffix)
         elif is_binary_file(self.__file_path):
@@ -218,6 +247,8 @@ class tool_file:
             table.cell(0, 0).text = self.data
         self.data.save(path if path else self.__file_path)
         return self
+    def save_as_gguf(self, path:str):
+        raise Exception(f'Unsupported to save model[{self.get_filename()}]')
     
     def get_data_type(self):
         return type(self.data)

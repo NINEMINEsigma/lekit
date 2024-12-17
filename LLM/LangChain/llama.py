@@ -41,15 +41,15 @@ def make_assistant_prompt(message:str):
 class light_llama_core(abs_llm_core):
     def __init__(self,
                  model:         Union[str, tool_file, ChatLlamaCpp],
-                 init_message:  Union[MessageObject, List[MessageObject]]   = []
-                 ):
+                 init_message:  Union[MessageObject, List[MessageObject]]   = [],
+                 *args, **kwargs):
         if isinstance(init_message, List) is False:
             if isinstance(init_message, str):
                 init_message = make_system_prompt(init_message)
             else:
                 init_message = [init_message]
         if isinstance(model, ChatLlamaCpp) is False:
-            model = ChatLlamaCpp(model_path=UnWrapper(model))
+            model = ChatLlamaCpp(model_path=UnWrapper(model), *args, **kwargs)
         self.init_message_list      :List[MessageObject]    = init_message
         self.hestroy_message_list   :List[MessageObject]    = self.init_message_list
         self.model                  :ChatLlamaCpp           = model
@@ -64,6 +64,16 @@ class light_llama_core(abs_llm_core):
         self.hestroy_message_list.append(make_assistant_prompt(result.content))
         self.last_result = result
         return result
+    
+    def set_init_message(self, init_message:Union[MessageObject, List[MessageObject]]):
+        self.clear_hestroy()
+        if isinstance(init_message, List) is False:
+            if isinstance(init_message, str):
+                init_message = make_system_prompt(init_message)
+            else:
+                init_message = [init_message]
+        self.init_message_list = init_message
+        return self
     
     def clear_hestroy(self):
         self.hestroy_message_list = self.init_message_list
@@ -151,6 +161,11 @@ class light_llama_prompt(Callable[[light_llama_core], object]):
     def __or__(self, role:MessageType, message_format:str, /):
         return self.from_single_chat(role, message_format)
     
+    def s_append(self, message_format:str):
+        return self.append("system", message_format)
+    def h_append(self, message_format:str):
+        return self.append("human", message_format)
+    
     def __call__(self, core:light_llama_core=None):
         if core is None:
             core = self.core
@@ -170,9 +185,9 @@ if __name__ == '__main__':
         model=model_path,
         init_message=[make_system_prompt("You are a helpful assistant that translates English to Chinese. Translate the user sentence.")]
     )
-    prompt_template:    light_llama_prompt          = light_llama_prompt(llm).append(
-        "system", "You are a helpful assistant that translates {input_language} to {output_language}.").append(
-        "human", "{input}")
+    prompt_template:    light_llama_prompt          = light_llama_prompt(llm).s_append(
+        "You are a helpful assistant that translates {input_language} to {output_language}.").h_append(
+        "{input}")
     callable_temp = prompt_template()
     result = callable_temp(
         {
