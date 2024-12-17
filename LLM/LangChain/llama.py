@@ -51,19 +51,23 @@ class light_llama_core(abs_llm_core):
         if isinstance(model, ChatLlamaCpp) is False:
             model = ChatLlamaCpp(model_path=UnWrapper(model), *args, **kwargs)
         self.init_message_list      :List[MessageObject]    = init_message
-        self.hestroy_message_list   :List[MessageObject]    = self.init_message_list
+        self.hestroy_message_list   :List[MessageObject]    = self.init_message_list.copy()
         self.model                  :ChatLlamaCpp           = model
         self.last_result            :BaseMessage            = None
-        
+    
     def __str__(self):
         return str(self.hestroy_message_list)
     @override
     def __call__(self, message:str):
-        self.hestroy_message_list.append(make_human_prompt(message))
-        result = self.model.invoke(self.hestroy_message_list)
-        self.hestroy_message_list.append(make_assistant_prompt(result.content))
-        self.last_result = result
-        return result
+        try:
+            self.hestroy_message_list.append(make_human_prompt(message))
+            result = self.model.invoke(self.hestroy_message_list)
+            self.hestroy_message_list.append(make_assistant_prompt(result.content))
+            self.last_result = result
+        except ValueError:
+            self.clear_hestroy()
+            self.__call__(message)
+        return self.last_result
     
     def set_init_message(self, init_message:Union[MessageObject, List[MessageObject]]):
         self.clear_hestroy()
@@ -74,9 +78,13 @@ class light_llama_core(abs_llm_core):
                 init_message = [init_message]
         self.init_message_list = init_message
         return self
-    
+   
+    def pop_front_hestory(self):
+        if len(self.hestroy_message_list) > len(self.init_message_list):
+            self.hestroy_message_list.pop(len(self.init_message_list))
+        return self
     def clear_hestroy(self):
-        self.hestroy_message_list = self.init_message_list
+        self.hestroy_message_list = self.init_message_list.copy()
         return self
     def pop_hestroy(self):
         result = self.hestroy_message_list.pop()
