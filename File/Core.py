@@ -1,18 +1,27 @@
 import json
 import csv
+import shutil
+import pandas as pd
 import xml.etree.ElementTree as ET
 import os
 import sys
+import pickle
 
-from typing                     import *
-from pydub                      import AudioSegment
-from PIL                        import Image
-from docx                       import Document
-from docx.document              import Document as DocumentObject
-from lekit.LLM.LangChain.llama  import light_llama_core
+from lekit.Str.Core                     import UnWrapper, list_byte_to_string
+
+from typing                                         import *
+from pathlib                                        import Path
+from pydub                                          import AudioSegment
+from PIL                                            import Image, ImageFile
+from docx                                           import Document
+from docx.document                                  import Document as DocumentObject
+from langchain_core.language_models.chat_models     import BaseChatModel
+from langchain_community.chat_models.llamacpp       import *
+
 
 audio_file_type = ["mp3","ogg","wav"]
 image_file_type = ['png', 'jpg', 'jpeg', 'bmp', 'svg', 'ico']
+temp_tool_file_path_name = "temp.tool_file"
 
 is_binary_file_functional_test_length:int = 1024
 
@@ -28,6 +37,9 @@ def is_binary_file(file_path: str) -> bool:
     
 def get_extension_name(file:str):
         return os.path.splitext(file)[1][1:]
+    
+def get_base_filename(file:str):
+    return os.path.basename(file)
     
 def is_image_file(file_path:str):
     return get_extension_name(file_path) in image_file_type
@@ -60,6 +72,18 @@ class tool_file:
     def __len__(self):
         return len(self.datas)
         
+    def __or__(self, other):
+        return tool_file(os.path.join(self.get_path(), UnWrapper(other)))
+    def __idiv__(self, other):
+        self.close()
+        temp = self.__or__(other)
+        self.__file_path = temp.get_path()
+        
+    def to_path(self):
+        return Path(self.__file_path)
+    def __Path__(self):
+        return Path(self.__file_path)
+        
     def create(self):
         if self.exists() == False:
             self.open('w')
@@ -70,7 +94,30 @@ class tool_file:
         self.close()
         if self.exists():
             os.remove(self.__file_path)
-
+    def copy(self, to_path:str):
+        if self.exists() is False:
+            raise FileNotFoundError("file not found")
+        self.close()
+        shutil.copy(self.__file_path, to_path)
+        return self
+    def move(self, to_path:str):
+        if self.exists() is False:
+            raise FileNotFoundError("file not found")
+        self.close()
+        shutil.move(self.__file_path, to_path)
+        self.__file_path = to_path
+        return self
+    def rename(self, newpath:str):
+        if self.exists() is False:
+            raise FileNotFoundError("file not found")
+        self.close()
+        if '\\' in newpath or '/' in newpath:
+            newpath = get_base_filename(newpath)
+        new_current_path = os.path.join(self.get_dir(), newpath)
+        os.rename(self.__file_path, new_current_path)
+        self.__file_path = new_current_path
+        return self
+        
     def refresh(self):
         self.load()
         return self
@@ -90,6 +137,12 @@ class tool_file:
         return self.__file
         
     def load(self):
+        if self.__file_path is None:
+            raise FileNotFoundError("file path is none")
+        elif self.is_dir():
+            self.__file = open(os.path.join(self.get_path(), temp_tool_file_path_name), 'rb')
+            self.data = pickle.load(self.__file)
+            return self.data
         suffix = self.get_extension()
         if suffix == 'json':
             self.load_as_json()
@@ -114,33 +167,33 @@ class tool_file:
         else:
             self.load_as_text()
         return self.data
-    def load_as_json(self):
+    def load_as_json(self) -> pd.DataFrame:
         self.open('r')
         self.data = json.load(self.__file)
         return self.data
-    def load_as_csv(self):
-        self.open('r')
-        self.data = csv.reader(self.__file)
-        return self.data
-    def load_as_xml(self):
-        self.open('r')
-        self.data = ET.parse(self.__file)
-        return self.data
-    def load_as_dataframe(self):
+    def load_as_csv(self) -> pd.DataFrame:
         self.open('r')
         self.data = pd.read_csv(self.__file)
         return self.data
-    def load_as_excel(self):
+    def load_as_xml(self) -> pd.DataFrame:
+        self.open('r')
+        self.data = pd.read_xml(self.__file)
+        return self.data
+    def load_as_dataframe(self) -> pd.DataFrame:
+        self.open('r')
+        self.data = pd.read_csv(self.__file)
+        return self.data
+    def load_as_excel(self) -> pd.DataFrame:
         self.open('r')
         self.data = pd.read_excel(self.__file)
         return self.data
-    def load_as_binary(self):
+    def load_as_binary(self) -> bytes:
         self.open('rb')
         self.data = self.__file.read()
         return self.data
-    def load_as_text(self):
+    def load_as_text(self) -> str:
         self.open('r')
-        self.data = self.__file.readlines()
+        self.data = list_byte_to_string(self.__file.readlines())
         return self.data
     def load_as_wav(self):
         self.data = AudioSegment.from_wav(self.__file_path)
@@ -148,21 +201,27 @@ class tool_file:
     def load_as_audio(self):
         self.data = AudioSegment.from_file(self.__file_path)
         return self.data
-    def load_as_image(self):
+    def load_as_image(self) -> ImageFile.ImageFile:
         self.data = Image.open(self.__file_path)
         return self.data
-    def load_as_docx(self):
+    def load_as_docx(self) -> DocumentObject:
         self.data = Document(self.__file_path)
         return self.data
-    def load_as_gguf(self):
+    def load_as_gguf(self) -> Union[ChatLlamaCpp]:
         if 'llama' in self.__file_path.lower():
-            self.data = light_llama_core(self)
+            self.data = ChatLlamaCpp(self)
             self.datas["model"] = self.data
         else:
             raise Exception('Unsupported model type')
         return self.data
 
     def save(self, path:str=None):
+        if path is None and self.__file_path is None:
+            raise Exception('No file path specified')
+        elif path is None and self.is_dir():
+            with open(os.path.join(self.__file_path, temp_tool_file_path_name),'wb') as temp_file:
+                pickle.dump(self.data, temp_file)
+            return self
         suffix = self.get_extension(path)
         if suffix == 'json':
             self.save_as_json(path)
@@ -188,37 +247,24 @@ class tool_file:
             self.save_as_text(path)
         return self
     def save_as_json(self, path:str):
-        if path is not None:
-            with open(path, 'w') as f:
-                json.dumps(self.data, f)
-        else:
-            json.dump(self.data, self.__file)
+        path = path if path else self.__file_path
+        json.dump(self.data, self.__file)
         return self
     def save_as_csv(self, path:str):
-        if path is not None:
-            with open(path, 'w') as f:
-                csv.writer(f).writerows(self.data)
-        else:
-            csv.writer(self.__file).writerows(self.data)
+        path = path if path else self.__file_path
+        self.data.to_csv(path)
         return self
     def save_as_xml(self, path:str):
-        if path is not None:
-            with open(path, 'w') as f:
-                self.data.write(f)
-        else:
-            self.data.write(self.__file)
+        path = path if path else self.__file_path
+        self.data.to_xml(path)
         return self
     def save_as_dataframe(self, path:str):
-        if path is not None:
-            self.data.to_csv(path)
-        else:
-            self.data.to_csv(self.__file)
+        path = path if path else self.__file_path
+        self.data.to_csv(path)
         return self
     def save_as_excel(self, path:str):
-        if path is not None:
-            self.data.to_excel(path, index=False)
-        else:
-            self.data.to_excel(self.__file, index=False)
+        path = path if path else self.__file_path
+        self.data.to_excel(path, index=False)
         return self
     def save_as_binary(self, path:str):
         if path is not None:
@@ -253,12 +299,18 @@ class tool_file:
     def get_data_type(self):
         return type(self.data)
     def get_extension(self, path:str=None):
+        if self.is_dir() and path is None:
+            raise Exception("Cannot get extension of a directory")
         path = path if path is not None else self.__file_path
+        if path is None:
+            raise Exception("Cannot get extension without target path")
         return get_extension_name(path)
     def get_path(self):
         return self.__file_path
     def get_filename(self):
-        return os.path.basename(self.__file_path)
+        return get_base_filename(self.__file_path)
+    def get_dir(self):
+        return os.path.dirname(self.__file_path)
     
     def is_dir(self):
         return os.path.isdir(self.__file_path)
@@ -275,6 +327,10 @@ class tool_file:
             os.makedirs(dir_path)
     def dir_iter(self):
         return os.listdir(self.__file_path)
+    def back_to_parent_dir(self):
+        self.close()
+        self.__file_path = self.get_dir()
+        return self
     
     def append_text(self, line:str):
         if self.data is str:
@@ -285,3 +341,22 @@ class tool_file:
             raise TypeError(f"Unsupported data type for {sys._getframe().f_code.co_name}")
         return self
     
+    def bool(self):
+        return self.exists()
+    def __bool__(self):
+        return self.exists()
+    
+    def must_exists_as_new(self):
+        self.close()
+        self.try_create_parent_path()
+        with open(self.get_path(),"wb") as _:
+            pass
+    
+def Wrapper(file) -> tool_file:
+    return tool_file(UnWrapper(file))
+    
+if __name__ == "__main__":
+    a = tool_file("abc/")
+    b = tool_file("a.x")
+    c = a|b
+    print(c.get_path())

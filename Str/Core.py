@@ -1,6 +1,6 @@
+from pathlib import Path
 from typing                         import *
 from lekit.Lang.Reflection          import light_reflection
-from lekit.File.Core                import tool_file
 
 def limit_str(data, max_length=50):
     s:str = data if data is str else str(data)
@@ -73,8 +73,8 @@ class light_str:
 def UnWrapper(from_) -> str:
     if isinstance(from_, str):
         return from_
-    elif isinstance(from_, tool_file):
-        return from_.get_path()
+    elif isinstance(from_, Path):
+        return str(from_)
     
     ReEx = light_reflection(from_)
     if ReEx.contains_method("to_string"):
@@ -87,7 +87,7 @@ def UnWrapper(from_) -> str:
 def Able_UnWrapper(from_) -> bool:
     if isinstance(from_, str):
         return True
-    elif isinstance(from_, tool_file):
+    elif isinstance(from_, Path):
         return True
     
     ReEx = light_reflection(from_)
@@ -96,4 +96,26 @@ def Able_UnWrapper(from_) -> bool:
     elif ReEx.contains_method("__str__"):
         return True
     else:
-        raise False
+        return False
+    
+def Combine(*args) -> str:
+    result:str = ""
+    if len(args) == 1:
+        if isinstance(args[0], Sequence):
+            for current in args:
+                result += UnWrapper(current)
+        else:
+            result = UnWrapper(args[0])
+    else:
+        for current in args:
+            result += UnWrapper(current)
+    
+def list_byte_to_list_string(lines:List[bytes], encoding='utf-8') -> List[str]:
+    return [line.decode(encoding) for line in lines]
+    
+def list_byte_to_string(lines:List[bytes], encoding='utf-8') -> str:
+    return "".join(list_byte_to_list_string(lines, encoding))
+    
+    
+    
+    
