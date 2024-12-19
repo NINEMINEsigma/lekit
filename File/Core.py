@@ -1,8 +1,6 @@
 import json
-import csv
 import shutil
 import pandas as pd
-import xml.etree.ElementTree as ET
 import os
 import sys
 import pickle
@@ -15,7 +13,6 @@ from pydub                                          import AudioSegment
 from PIL                                            import Image, ImageFile
 from docx                                           import Document
 from docx.document                                  import Document as DocumentObject
-from langchain_core.language_models.chat_models     import BaseChatModel
 from langchain_community.chat_models.llamacpp       import *
 
 
@@ -46,15 +43,14 @@ def is_image_file(file_path:str):
 
 class tool_file:
     
-    datas_lit_key = Literal["model"]
+    __datas_lit_key:    Literal["model"] = "model"
     
-    def __init__(self, file_path:str, file_mode:str=None):
+    def __init__(self, file_path:str, file_mode:str=None, *args, **kwargs):
         self.__file_path:   str             = file_path
-        self.datas:         Dict[str,Any]   = {}
-        if file_mode is None:
-            self.__file = None
-        else:
-            self.open(file_mode)
+        self.datas:         Dict[str, Any]  = {}
+        self.__file:        IO[Any]         = None
+        if file_mode is not None:
+            self.open(file_mode, *args, **kwargs)
     def __del__(self):
         self.close()
     def __str__(self):
@@ -121,17 +117,17 @@ class tool_file:
     def refresh(self):
         self.load()
         return self
-    def open(self, mode='r', is_refresh=False, encoding:str='utf-8'):
+    def open(self, mode='r', is_refresh=False, encoding:str='utf-8', *args, **kwargs):
         self.close()
-        self.__file = open(self.__file_path, mode, encoding=encoding)
+        self.__file = open(self.__file_path, mode, encoding=encoding, *args, **kwargs)
         if is_refresh:
             self.refresh()
         return self.__file
     def close(self):
         if self.__file:
             self.__file.close()
-        if "model" in self.datas:
-            self.datas["model"] = None
+        if self.__datas_lit_key in self.datas:
+            self.datas[self.__datas_lit_key] = None
         return self.__file
     def is_open(self)->bool:
         return self.__file
@@ -210,7 +206,7 @@ class tool_file:
     def load_as_gguf(self) -> Union[ChatLlamaCpp]:
         if 'llama' in self.__file_path.lower():
             self.data = ChatLlamaCpp(self)
-            self.datas["model"] = self.data
+            self.datas[self.__datas_lit_key] = self.data
         else:
             raise Exception('Unsupported model type')
         return self.data

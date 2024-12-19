@@ -1,6 +1,5 @@
 from types import NoneType
 from typing import *
-from lekit.Str.Core import UnWrapper
 
 # string
 
@@ -31,10 +30,10 @@ def make_map(*args, **kwargs) -> Dict[str, Any]:
     result:dict = {}
     index = 0
     for i in args:
-        result[UnWrapper(index)] = i
+        result[to_string(index)] = i
         index += 1
     for key in kwargs:
-        result[UnWrapper(key)] = kwargs[key]
+        result[to_string(key)] = kwargs[key]
     return result
 
 # LightDiagram::ld::instance<_Ty>
