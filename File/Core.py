@@ -13,7 +13,6 @@ from pydub                                          import AudioSegment
 from PIL                                            import Image, ImageFile
 from docx                                           import Document
 from docx.document                                  import Document as DocumentObject
-from langchain_community.chat_models.llamacpp       import *
 
 
 audio_file_type = ["mp3","ogg","wav"]
@@ -152,8 +151,6 @@ class tool_file:
             self.load_as_text()
         elif suffix == 'docx':
             self.load_as_docx()
-        elif suffix == 'gguf':
-            self.load_as_gguf()
         elif suffix in audio_file_type:
             self.load_as_audio()
         elif is_binary_file(self.__file_path):
@@ -203,13 +200,6 @@ class tool_file:
     def load_as_docx(self) -> DocumentObject:
         self.data = Document(self.__file_path)
         return self.data
-    def load_as_gguf(self) -> Union[ChatLlamaCpp]:
-        if 'llama' in self.__file_path.lower():
-            self.data = ChatLlamaCpp(self)
-            self.datas[self.__datas_lit_key] = self.data
-        else:
-            raise Exception('Unsupported model type')
-        return self.data
 
     def save(self, path:str=None):
         if path is None and self.__file_path is None:
@@ -231,8 +221,6 @@ class tool_file:
             self.save_as_text(path)
         elif suffix == 'docx':
             self.save_as_docx(path)
-        elif suffix == 'gguf':
-            self.save_as_gguf(path)
         elif suffix in audio_file_type:
             self.save_as_audio(path, suffix)
         elif is_binary_file(self.__file_path):
@@ -289,8 +277,6 @@ class tool_file:
             table.cell(0, 0).text = self.data
         self.data.save(path if path else self.__file_path)
         return self
-    def save_as_gguf(self, path:str):
-        raise Exception(f'Unsupported to save model[{self.get_filename()}]')
     
     def get_data_type(self):
         return type(self.data)
