@@ -4,27 +4,16 @@ from lekit.Str.Core                     import UnWrapper
 from lekit.File.Core                    import tool_file
 from lekit.Lang.CppLike                 import *
 
-from langchain_core.language_models.base    import *
 from langchain_core.messages.ai             import AIMessage
 from langchain_core.messages.tool           import ToolCall
 from langchain_core.utils.function_calling  import convert_to_openai_tool
 from langchain_core.prompts                 import ChatPromptTemplate
-from langchain_core.tools                   import tool
 from langchain_core.tools.base              import BaseTool
 from pydantic                               import BaseModel, Field
 
-from lekit.LLM.LangChain.AbsInterface   import abs_llm_core
+from lekit.LLM.LangChain.AbsInterface   import *
 
-MessageObject = LanguageModelInput
-MessageType = Literal[
-    "human", 
-    "user",
-    "ai",
-    "assistant",
-    "system", 
-    "function",
-    "tool"
-    ]
+# Make Defined
 
 def do_make_content(**kwargs) -> MessageObject:
     if len(kwargs) == 2 and "role" in kwargs and "content" in kwargs:
@@ -68,7 +57,7 @@ class light_llama_core(abs_llm_core):
     def __str__(self):
         return str(self.hestroy_message_list)
     @override
-    def __call__(self, message:str):
+    def __call__(self, message:Union[str, MessageObject]):
         try:
             self.hestroy_message_list.append(make_human_prompt(message))
             result = self.model.invoke(self.hestroy_message_list)
@@ -76,6 +65,7 @@ class light_llama_core(abs_llm_core):
             self.last_result = result
         except ValueError:
             self.pop_front_hestory()
+            self.pop_hestroy()
             self.__call__(message)
         return self.last_result
     
@@ -138,17 +128,28 @@ class light_llama_core(abs_llm_core):
     ) -> Runnable[MessageObject, BaseMessage]:
         return self.model.bind_tools(tools, tool_choice=tool_choice, **kwargs)
         
+    def with_structured_output(
+        self,
+        schema:         Union[Dict, Type[BaseModel]],
+        include_raw:    bool                            = False
+    ) -> Runnable[MessageObject, Union[Dict, BaseModel]]:
+        return self.model.with_structured_output(schema, include_raw=include_raw)
+    
+    def with_stream_output(self, message:MessageObject, callback:Callable[[str], None]):
+        for iter in self.model.stream(message):
+            callback(iter)
+        
 def Wrapper(model:Union[str, tool_file]):
     return light_llama_core(UnWrapper(model))
 
 # Tools Region
 
-class runnable_llama_call(Callable[[str], BaseMessage]):
+class runnable_llama_call(abs_llm_callable):
     def __init__(self, core:light_llama_core):
         self.core:          light_llama_core                        = core
         
     @override
-    def __call__(self, message:str) -> BaseMessage:
+    def __call__(self, message:Union[str, MessageObject]) -> BaseMessage:
         return self.core(message)
 
 def make_llama_call(core:light_llama_core):
@@ -162,13 +163,14 @@ class runnable_llama_prompt_call(Callable[[dict], BaseMessage]):
         self.chain:         RunnableSerializable[dict, BaseMessage] = self.prompt|self.core.model
         
     @override
-    def __call__(self, message_inserter:dict) -> BaseMessage:
+    def __call__(self, message_inserter:dict, **kwargs) -> BaseMessage:
         #self.core.append_hestroy() ##what need to set with ai role
-        self.last_result = self.chain.invoke(message_inserter)
+        combine_inserter:dict = { **message_inserter, **kwargs}
+        self.last_result = self.chain.invoke(combine_inserter)
         self.core.append_hestroy(make_human_prompt(self.last_result.content))
         return self.last_result.content
         
-class light_llama_prompt(Callable[[light_llama_core], object]):
+class light_llama_prompt(Callable[[light_llama_core], runnable_llama_prompt_call]):
     '''
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -326,43 +328,34 @@ def make_llama_functioncall(
         tool_choice=tool_choice_name,
         **kwargs)
 
-# Main
-    
-class MagicFunctionInput(BaseModel):
-    magic_function_input: int = Field(description="The input value for magic function")
+class runnable_llama_structured_call(Callable[[Union[str, MessageObject], Union[Dict, BaseModel]]]):
+    def __init__(
+            self, 
+            core:           light_llama_core,
+            schema:         Union[Dict, Type[BaseModel]],
+            include_raw:    bool                            = False
+        ):
+        self.core:              light_llama_core                                = core
+        self.structured_call:   Runnable[MessageObject, Union[Dict, BaseModel]] = core.with_structured_output(schema, include_raw)
+        
+    def __call__(self, message:Union[str, MessageObject]) -> Union[Dict, BaseModel]:
+        return self.structured_call.invoke(message)
 
-@tool("get_magic_function", args_schema=MagicFunctionInput)
-def magic_function(magic_function_input: int):
-    """Get the value of magic function for an input."""
-    return magic_function_input + 20
-@tool("get_target_function", args_schema=MagicFunctionInput)
-def target_function(magic_function_input: int):
-    """Get the value of target function for an input."""
-    return 95%magic_function_input
+def make_llama_structured_call(
+    core:               light_llama_core,
+    schema:             Union[Dict, Type[BaseModel]],
+    include_raw:        bool                            = False
+    ) -> runnable_llama_structured_call:
+    return runnable_llama_structured_call(core, schema, include_raw)
 
-def test_run():
-    # 设置模型路径
-    model_path=r'D:\LLM\MODELs\llama3-8B\Meta-Llama-3-8B-Instruct\Meta-Llama-3-8B-Instruct-Q4_0.gguf'
+# Template Of FunctionCall Defined
     
-    llm:                light_llama_core            = light_llama_core(
-        model=model_path,
-        init_message=[make_system_prompt("You are a helpful assistant that translates English to Chinese. Translate the user sentence.")]
-    )
-    
-    toolcall = make_llama_functioncall(llm, [magic_function, target_function], "get_magic_function")
-    
-    results = toolcall("I have one number, and it is bigger than 54 and lesser than 56, it's type is int, i need target number of it")
-    print("\n\n")
-    print("result:")
-    print(results["get_magic_function"])
-    print("AIMessage:")
-    print(toolcall.last_ai_message)
-    print("results:")
-    print(results)
-    print("toolcalls:")
-    print(toolcall.last_tool_calls)
-    
-if __name__ == '__main__':
-    test_run()
-    
-    
+class Internal_TemplateFunctionInput(BaseModel):
+    function_input: int = Field(description="The input value for function")
+
+@FunctionTool("get_function", args_schema=Internal_TemplateFunctionInput)
+def magic_function(function_input: int):
+    """Get the value of function for an input."""
+    return function_input + 1  
+
+# LLM Chain

@@ -1,7 +1,6 @@
 from typing             import *
 from lekit.File.Core    import *
 from lekit.Str.Core     import *
-from pandas             import DataFrame
 
 const_config_file = "config.json"
 

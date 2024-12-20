@@ -1,22 +1,45 @@
 from abc                                    import *
 from typing                                 import *
-from langchain_community.chat_models        import *
-from langchain_core.language_models.base    import *
-from langchain_core.tools                   import tool as function_call_tool
+from langchain_core.language_models.base    import BaseMessage
 
 from lekit.File.Core                        import tool_file
 
+# Internal Definition
+
+from langchain_core.tools                   import tool as FunctionTool
+from langchain_core.language_models.base    import *
+
+MessageObject = LanguageModelInput
+MessageType = Literal[
+    "human", 
+    "user",
+    "ai",
+    "assistant",
+    "system", 
+    "function",
+    "tool"
+    ]
+
 # Abstract part Definition
 
-class abs_llm_callable(Callable[[str], BaseMessage], ABC):
+class abs_llm_callable(Callable[[Union[str, MessageObject]], BaseMessage], ABC):
     @abstractmethod
     def __call__(self, message:str) -> BaseMessage:
         return None
+    
+    def invoke(self, message:str) -> BaseMessage:
+        return self(message)
 
 class abs_llm_core(abs_llm_callable, ABC):
     @abstractmethod
-    def save_hestroy(self, file:Union[tool_file,str]):
+    def save_hestroy(self, file:Union[tool_file, str]):
         pass
     @abstractmethod
-    def load_hestory(self, file:Union[tool_file,str]):
+    def load_hestory(self, file:Union[tool_file, str]):
         pass
+    
+
+
+
+
+
