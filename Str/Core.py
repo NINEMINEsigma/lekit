@@ -75,7 +75,7 @@ def UnWrapper(from_) -> str:
         return from_
     elif isinstance(from_, Path):
         return str(from_)
-    elif isinstance(from_, IO[Any]):
+    elif isinstance(from_, IO):
         return from_.name
     
     ReEx = light_reflection(from_)

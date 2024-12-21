@@ -1,4 +1,10 @@
-import cv2 as base
+from typing             import *
+
+import cv2              as     base
+from cv2.typing         import *
+
+from lekit.Str.Core     import UnWrapper
+from lekit.File.Core    import tool_file
 
 class light_cv_camera:
     def __init__(self, index:int = 0):
@@ -224,4 +230,73 @@ class light_cv_window:
 
     def wait_key(self, wait_time:int=0):
         return base.waitKey(wait_time)
+
+class ImageObject:
+    def __init__(self, image_path:Union[str, tool_file]):
+        self.image: MatLike = None
+        self.load_image(image_path)
+
+    def __bool__(self):
+        return self.image is not None
+    def bool(self):
+        return self.image is not None
+    def __MatLike__(self):
+        return self.image
+    def MatLike(self):
+        return self.image
+
+    def load_image(self, image_path):
+        """加载图片"""
+        self.image = base.imread(image_path)
+        return self
+
+    def save_image(self, save_path):
+        """保存图片"""
+        if self.image:
+            base.imwrite(save_path, self.image)
+        return self
+
+    def show_image(self, window_name="Image", delay = 0, *args, **kwargs):
+        """显示图片"""
+        if self.image is None:
+            return self
+        base.imshow(window_name, self.image)
+        base.waitKey(delay = delay,*args, **kwargs)
+        base.destroyWindow(window_name)
+        return self
+
+    def resize_image(self, width, height):
+        """调整图片大小"""
+        if self.image:
+            self.image = base.resize(self.image, (width, height))
+        return self
+
+    def rotate_image(self, angle):
+        """旋转图片"""
+        if self.image is None:
+            return self
+        (h, w) = self.image.shape[:2]
+        center = (w // 2, h // 2)
+        M = base.getRotationMatrix2D(center, angle, 1.0)
+        self.image = base.warpAffine(self.image, M, (w, h))
+        return self
+
+    def convert_to_grayscale(self):
+        """将图片转换为灰度图"""
+        if self.image is None:
+            return self
+        self.image = base.cvtColor(self.image, base.COLOR_BGR2GRAY)
+        return self
+
+# 示例使用
+if __name__ == "__main__":
+    img_obj = ImageObject("path/to/your/image.jpg")
+    img_obj.show_image()
+    img_obj.resize_image(800, 600)
+    img_obj.rotate_image(45)
+    img_obj.convert_to_grayscale()
+    img_obj.save_image("path/to/save/image.jpg")
+
+
+
 

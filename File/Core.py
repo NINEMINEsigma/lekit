@@ -99,7 +99,10 @@ class tool_file:
     def remove(self):
         self.close()
         if self.exists():
-            os.remove(self.__file_path)
+            if self.is_dir():
+                shutil.rmtree(self.__file_path)
+            else:
+                os.remove(self.__file_path)
         return self
     def copy(self, to_path:Union[Self, str]):
         if self.exists() is False:
@@ -342,6 +345,10 @@ class tool_file:
             if ignore_folder and os.path.isdir(os.path.join(self.__file_path, content)):
                 continue
             result += 1
+    def dir_clear(self):
+        for file in self.dir_tool_file_iter():
+            file.remove()
+        return self
     
     def append_text(self, line:str):
         if self.data is str:
@@ -376,29 +383,29 @@ def Wrapper(file) -> tool_file:
         return tool_file(UnWrapper(file))
 
 def split_elements(
-    file:           Union[tool_file, str], 
-    *, 
-    ratios:         List[float]                                 = [1,1],
-    pr:             Optional[Callable[[tool_file], bool]]       = None,
-    shuffler:       Optional[Callable[[List[tool_file]], None]] = None,
-    output:         Optional[List[tool_file]]                   = None,
-    output_must:    bool                                        = True,
-    output_callback:Optional[Callable[[tool_file], None]]       = None
+    file:               Union[tool_file, str], 
+    *,  
+    ratios:             List[float]                                 = [1,1],
+    pr:                 Optional[Callable[[tool_file], bool]]       = None,
+    shuffler:           Optional[Callable[[List[tool_file]], None]] = None,
+    output_dirs:        Optional[List[tool_file]]                   = None,
+    output_must_exist:  bool                                        = True,
+    output_callback:    Optional[Callable[[tool_file], None]]       = None
     ) -> List[List[tool_file]]:
     result:                 List[List[tool_file]]   = BaseClass.split_elements(Wrapper(file).dir_tool_file_iter(),
                                       ratios=ratios,
                                       pr=pr,
                                       shuffler=shuffler)
-    if output is None:
+    if output_dirs is None:
         return result
-    for i in range(min(len(output), len(result))):
-        output_dir:         tool_file               = output[i]
+    for i in range(min(len(output_dirs), len(result))):
+        output_dir:         tool_file               = output_dirs[i]
         if output_dir.is_dir() is False:
             raise Exception("Outputs must be directory")
-        if output_must:
+        if output_must_exist:
             output_dir.must_exists_as_new()
         for file in result[i]:
-            current = output[i].make_file_inside(file)
+            current = output_dirs[i].make_file_inside(file)
             if output_callback:
                 output_callback(current)
         
