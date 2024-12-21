@@ -4,8 +4,10 @@ import pandas as pd
 import os
 import sys
 import pickle
+import random
 
 from lekit.Str.Core                     import UnWrapper, list_byte_to_string
+from lekit.Lang                         import BaseClass
 
 from typing                                         import *
 from pathlib                                        import Path
@@ -13,7 +15,6 @@ from pydub                                          import AudioSegment
 from PIL                                            import Image, ImageFile
 from docx                                           import Document
 from docx.document                                  import Document as DocumentObject
-
 
 audio_file_type = ["mp3","ogg","wav"]
 image_file_type = ['png', 'jpg', 'jpeg', 'bmp', 'svg', 'ico']
@@ -68,7 +69,10 @@ class tool_file:
         return len(self.datas)
         
     def __or__(self, other):
-        return tool_file(os.path.join(self.get_path(), UnWrapper(other)))
+        if other is None:
+            return tool_file(self.get_path() if self.is_dir() else self.get_path()+"\\")
+        else:
+            return tool_file(os.path.join(self.get_path(), UnWrapper(other)))
     def __idiv__(self, other):
         self.close()
         temp = self.__or__(other)
@@ -81,31 +85,40 @@ class tool_file:
         
     def create(self):
         if self.exists() == False:
-            self.open('w')
-            self.close()
+            if self.is_dir():
+                if os.path.exists(self.get_dir()):
+                    os.makedirs(self.__file_path)
+                else:
+                    raise FileNotFoundError(f"{self.__file_path} cannt create, because its parent path is not exist")
+            else:
+                self.open('w')
+                self.close()
+        return self
     def exists(self):
         return os.path.exists(self.__file_path)
     def remove(self):
         self.close()
         if self.exists():
             os.remove(self.__file_path)
-    def copy(self, to_path:str):
-        if self.exists() is False:
-            raise FileNotFoundError("file not found")
-        self.close()
-        shutil.copy(self.__file_path, to_path)
         return self
-    def move(self, to_path:str):
+    def copy(self, to_path:Union[Self, str]):
         if self.exists() is False:
             raise FileNotFoundError("file not found")
         self.close()
-        shutil.move(self.__file_path, to_path)
+        shutil.copy(self.__file_path, UnWrapper(to_path))
+        return self
+    def move(self, to_path:Union[Self, str]):
+        if self.exists() is False:
+            raise FileNotFoundError("file not found")
+        self.close()
+        shutil.move(self.__file_path, UnWrapper(to_path))
         self.__file_path = to_path
         return self
-    def rename(self, newpath:str):
+    def rename(self, newpath:Union[Self, str]):
         if self.exists() is False:
             raise FileNotFoundError("file not found")
         self.close()
+        newpath:str = UnWrapper(newpath)
         if '\\' in newpath or '/' in newpath:
             newpath = get_base_filename(newpath)
         new_current_path = os.path.join(self.get_dir(), newpath)
@@ -295,7 +308,10 @@ class tool_file:
         return os.path.dirname(self.__file_path)
     
     def is_dir(self):
-        return os.path.isdir(self.__file_path)
+        if self.__file_path[-1] == '\\' or self.get_path()[-1] == '/':
+            return True
+        else:
+            return os.path.isdir(self.__file_path)
     def is_file(self):
         return os.path.isfile(self.__file_path)
     def is_binary_file(self):
@@ -309,10 +325,23 @@ class tool_file:
             os.makedirs(dir_path)
     def dir_iter(self):
         return os.listdir(self.__file_path)
+    def dir_tool_file_iter(self):
+        result = [self]
+        result.clear()
+        for file in os.listdir(self.__file_path):
+            result.append(self|file)
+        return result
     def back_to_parent_dir(self):
         self.close()
         self.__file_path = self.get_dir()
         return self
+    def dir_count(self, ignore_folder:bool = True):
+        iter    = self.dir_iter()
+        result  = 0
+        for content in iter:
+            if ignore_folder and os.path.isdir(os.path.join(self.__file_path, content)):
+                continue
+            result += 1
     
     def append_text(self, line:str):
         if self.data is str:
@@ -331,14 +360,56 @@ class tool_file:
     def must_exists_as_new(self):
         self.close()
         self.try_create_parent_path()
-        with open(self.get_path(),"wb") as _:
-            pass
+        self.create()
+        
+    def make_file_inside(self, data:Self):
+        if self.is_dir() is False:
+            raise Exception("Cannot make file inside a file, because this object target is not a directory")
+        result = self|data.get_filename()
+        data.copy(result)
+        return result
     
 def Wrapper(file) -> tool_file:
-    return tool_file(UnWrapper(file))
-    
+    if isinstance(file, tool_file):
+        return file
+    else:
+        return tool_file(UnWrapper(file))
+
+def split_elements(
+    file:           Union[tool_file, str], 
+    *, 
+    ratios:         List[float]                                 = [1,1],
+    pr:             Optional[Callable[[tool_file], bool]]       = None,
+    shuffler:       Optional[Callable[[List[tool_file]], None]] = None,
+    output:         Optional[List[tool_file]]                   = None,
+    output_must:    bool                                        = True,
+    output_callback:Optional[Callable[[tool_file], None]]       = None
+    ) -> List[List[tool_file]]:
+    result:                 List[List[tool_file]]   = BaseClass.split_elements(Wrapper(file).dir_tool_file_iter(),
+                                      ratios=ratios,
+                                      pr=pr,
+                                      shuffler=shuffler)
+    if output is None:
+        return result
+    for i in range(min(len(output), len(result))):
+        output_dir:         tool_file               = output[i]
+        if output_dir.is_dir() is False:
+            raise Exception("Outputs must be directory")
+        if output_must:
+            output_dir.must_exists_as_new()
+        for file in result[i]:
+            current = output[i].make_file_inside(file)
+            if output_callback:
+                output_callback(current)
+        
+    return result
+
+
 if __name__ == "__main__":
     a = tool_file("abc/")
     b = tool_file("a.x")
     c = a|b
     print(c.get_path())
+    
+    
+    
