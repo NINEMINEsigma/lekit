@@ -1,6 +1,7 @@
 from typing             import *
 from lekit.File.Core    import tool_file
 from lekit.Str.Core     import UnWrapper
+import os
 
 const_config_file = "config.json"
 
@@ -12,8 +13,10 @@ class GlobalConfig:
     def config_file(self):
         return self.get_config_file()
     
-    def __init__(self, data_dir:Union[tool_file, str]="./", is_try_create_data_dir:bool=False):
+    def __init__(self, data_dir:Optional[Union[tool_file, str]]=None, is_try_create_data_dir:bool=False):
         # build up data folder
+        if data_dir is None:
+            data_dir = tool_file(os.path.abspath('.'))
         self.data_dir:tool_file = data_dir if isinstance(data_dir, tool_file) else tool_file(UnWrapper(data_dir))
         if self.data_dir.exists() is False:
             if is_try_create_data_dir:
@@ -44,7 +47,7 @@ class GlobalConfig:
     def get_file(self, file:str, is_must:bool=False):
         result = self.data_dir|file
         if is_must and result.exists() is False:
-            result.must_exists_as_new()
+            result.must_exists_path()
         return result
     def erase_file(self, file:str):
         result = self.data_dir|file

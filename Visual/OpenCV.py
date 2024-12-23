@@ -31,8 +31,11 @@ class light_cv_camera:
         return self
     
     def current_frame(self):
-        _, frame = self.capture.read()
-        return frame
+        stats, frame = self.capture.read()
+        if stats:
+            return frame
+        else:
+            return None
     def current_stats(self):
         stats, _ = self.capture.read()
         return stats
@@ -249,7 +252,7 @@ class ImageObject:
         return self.shape[1]
 
     def is_enable(self):
-        return self.__image is not None or (self.__camera is not None and self.__camera.is_open())
+        return self.image is not None
     def is_invalid(self):
         return self.is_enable() is False
     def __bool__(self):
@@ -293,23 +296,26 @@ class ImageObject:
     def show_image(
         self, 
         window_name:        str                         = "Image", 
-        delay:              int                         = 0,
-        image_show_func:    Callable[[Self], None]   = None,
+        delay:              Union[int,str]              = 0,
+        image_show_func:    Callable[[Self], None]      = None,
         *args, **kwargs
         ):
         """显示图片"""
         if self.is_invalid():
             return self
         if self.camera is not None:
-            while wait_key(1) & 0xFF != ord(delay):
+            while wait_key(1) & 0xFF != ord(str(delay)[0]) and self.camera is not None:
+                # dont delete this line, self.image is camera flame now, see<self.current = None>
                 self.current = self.image
                 if image_show_func is not None:
                     image_show_func(self)
-                base.imshow(window_name, self.current)
+                if self.current is not None:
+                    base.imshow(window_name, self.current)
+                # dont delete this line, see property<image>
                 self.current = None
         else:
             base.imshow(window_name, self.image)
-            base.waitKey(delay = delay, *args, **kwargs)
+            base.waitKey(delay = int(delay), *args, **kwargs)
         if base.getWindowProperty(window_name, base.WND_PROP_VISIBLE) > 0:
             base.destroyWindow(window_name)
         return self
