@@ -106,6 +106,7 @@ def Combine(*args) -> str:
         if isinstance(args[0], Sequence):
             for current in args:
                 result += UnWrapper(current)
+                result += ","
         else:
             result = UnWrapper(args[0])
     else:

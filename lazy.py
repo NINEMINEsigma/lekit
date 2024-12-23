@@ -1,6 +1,6 @@
 from typing             import *
-from lekit.File.Core    import *
-from lekit.Str.Core     import *
+from lekit.File.Core    import tool_file
+from lekit.Str.Core     import UnWrapper
 
 const_config_file = "config.json"
 
@@ -12,7 +12,7 @@ class GlobalConfig:
     def config_file(self):
         return self.get_config_file()
     
-    def __init__(self, data_dir:Union[tool_file, str], is_try_create_data_dir:bool=False):
+    def __init__(self, data_dir:Union[tool_file, str]="./", is_try_create_data_dir:bool=False):
         # build up data folder
         self.data_dir:tool_file = data_dir if isinstance(data_dir, tool_file) else tool_file(UnWrapper(data_dir))
         if self.data_dir.exists() is False:

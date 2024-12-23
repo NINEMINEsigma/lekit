@@ -31,16 +31,14 @@ class light_cv_camera:
         return self
     
     def current_frame(self):
-        stats, frame = self.capture.read()
-        if stats is False:
-            return None
+        _, frame = self.capture.read()
         return frame
     def current_stats(self):
         stats, _ = self.capture.read()
         return stats
     
-    def save_current_frame(self, file_name:str = "current.png"):
-        base.imwrite(file_name, self.current_frame())
+    def save_current_frame(self, file_name:Union[str, tool_file] = "current.png"):
+        base.imwrite(Unwrapper2Str(file_name), self.current_frame())
         return self
     def show_current_frame(self, window_name:str = 'frame'):
         base.imshow(window_name, self.current_frame())
@@ -158,7 +156,6 @@ class light_cv_camera:
                 break
             writer.write(self.current_frame())
         
-    
 class ImageObject:
     def __init__(
         self,
@@ -243,7 +240,7 @@ class ImageObject:
     
     @property
     def shape(self):
-        return self.__image.shape
+        return self.image.shape
     @property
     def height(self):
         return self.shape[0]
@@ -258,7 +255,7 @@ class ImageObject:
     def __bool__(self):
         return self.is_enable()
     def __MatLike__(self):
-        return self.__image
+        return self.image
 
     def load_image(
         self, 
@@ -517,21 +514,29 @@ class light_cv_window:
         if self.__my_window_name is not None and base.getWindowProperty(self.__my_window_name, base.WND_PROP_VISIBLE) > 0:
             base.destroyWindow(self.__my_window_name)
         return self
-            
+    
+    @property
+    def window_rect(self):
+        return base.getWindowImageRect(self.__my_window_name)
+    @window_rect.setter
+    def window_rect(self, rect:Tuple[float, float, float, float]):
+        self.set_window_rect(rect[0], rect[1], rect[2], rect[3])
+    
     def set_window_size(self, weight:int, height:int):
         base.resizeWindow(self.__my_window_name, weight, height)
         return self
     def get_window_size(self) -> Tuple[float, float]:
-        return base.getWindowProperty(self.__my_window_name, base.WINDOW_WIDTH), base.getWindowProperty(self.__my_window_name, base.WINDOW_HEIGHT)
+        rect = self.window_rect
+        return rect[2], rect[3]
     
     def get_window_property(self, prop_id:int):
         return base.getWindowProperty(self.__my_window_name, prop_id)
     def set_window_property(self, prop_id:int, prop_value:int):
         return base.setWindowProperty(self.__my_window_name, prop_id, prop_value)
     def get_prop_frame_width(self):
-        return base.getWindowProperty(self.__my_window_name, base.WINDOW_WIDTH)
+        return self.window_rect[2]
     def get_prop_frame_height(self):
-        return base.getWindowProperty(self.__my_window_name, base.WINDOW_HEIGHT)
+        return self.window_rect[3]
     def is_full_window(self):
         return base.getWindowProperty(self.__my_window_name, base.WINDOW_FULLSCREEN) > 0
     def set_full_window(self):
