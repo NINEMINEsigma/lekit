@@ -108,14 +108,20 @@ class tool_file:
         if self.exists() is False:
             raise FileNotFoundError("file not found")
         self.close()
-        shutil.copy(self.__file_path, UnWrapper(to_path))
-        return self
+        target_file = tool_file(UnWrapper(to_path))
+        if target_file.is_dir():
+            target_file = target_file|self.get_filename()
+        shutil.copy(self.__file_path, UnWrapper(target_file))
+        return target_file
     def move(self, to_path:Union[Self, str]):
         if self.exists() is False:
             raise FileNotFoundError("file not found")
         self.close()
-        shutil.move(self.__file_path, UnWrapper(to_path))
-        self.__file_path = to_path
+        target_file = tool_file(UnWrapper(to_path))
+        if target_file.is_dir():
+            target_file = target_file|self.get_filename()
+        shutil.move(self.__file_path, UnWrapper(target_file))
+        self.__file_path = target_file.get_path()
         return self
     def rename(self, newpath:Union[Self, str]):
         if self.exists() is False:
@@ -324,8 +330,11 @@ class tool_file:
     
     def try_create_parent_path(self):
         dir_path = os.path.dirname(self.__file_path)
+        if dir_path == '':
+            return self
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
+        return self
     def dir_iter(self):
         return os.listdir(self.__file_path)
     def dir_tool_file_iter(self):
@@ -368,6 +377,9 @@ class tool_file:
         self.close()
         self.try_create_parent_path()
         self.create()
+        return self
+    def must_exists_path(self):
+        return self.must_exists_as_new()
         
     def make_file_inside(self, data:Self):
         if self.is_dir() is False:
