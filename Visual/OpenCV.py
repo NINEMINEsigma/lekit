@@ -242,7 +242,8 @@ class ImageObject:
         return self.image.ndim
     
     @property
-    def shape(self):
+    def shape(self) -> Tuple[int, int, int]:
+        '''height, width, depth'''
         return self.image.shape
     @property
     def height(self) -> int:
@@ -364,6 +365,9 @@ class ImageObject:
     def merge_channels(self, blue:MatLike, green:MatLike, red:MatLike):
         """合并通道"""
         return self.merge_channels_from_list([blue, green, red])
+    def merge_channel_list(self, bgr:List[MatLike]):
+        """合并通道"""
+        return self.merge_channels_from_list(bgr)
 
     # Transform
     def get_resize_image(self, width:int, height:int):
@@ -380,13 +384,13 @@ class ImageObject:
     def resize_image(self, width:int, height:int):
         """调整图片大小"""
         new_image = self.get_resize_image(width, height)
-        if new_image:
+        if new_image is not None:
             self.image = new_image
         return self
     def rotate_image(self, angle:float):
         """旋转图片"""
         new_image = self.get_rotate_image(angle)
-        if new_image:
+        if new_image is not None:
             self.image = new_image
         return self
     
@@ -499,32 +503,61 @@ class ImageObject:
         images.append(self)
         return ImageObject(np.hstack([np.uint8(image.image) for image in images]))
     
-    def add(self, image:Self):
-        self.image = base.add(self.image, image.image)
+    def add(self, image_or_value:Union[Self, int]):
+        if isinstance(image_or_value, int):
+            self.image = base.add(self.image, image_or_value)
+        else:
+            self.image = base.add(self.image, image_or_value.image)
         return self
-    def __add__(self, image:Self):
-        return ImageObject(self.image.copy()).add(image)
-    def subtract(self, image:Self):
-        self.image = base.subtract(self.image, image.image)
+    def __add__(self, image_or_value:Union[Self, int]):
+        return ImageObject(self.image.copy()).add(image_or_value)
+    def subtract(self, image_or_value:Union[Self, int]):
+        if isinstance(image_or_value, int):
+            self.image = base.subtract(self.image, image_or_value)
+        else:
+            self.image = base.subtract(self.image, image_or_value.image)
         return self
-    def multiply(self, image:Self):
-        self.image = base.multiply(self.image, image.image)
+    def __sub__(self, image_or_value:Union[Self, int]):
+        return ImageObject(self.image.copy()).subtract(image_or_value)
+    def multiply(self, image_or_value:Union[Self, int]):
+        if isinstance(image_or_value, int):
+            self.image = base.multiply(self.image, image_or_value)
+        else:
+            self.image = base.multiply(self.image, image_or_value.image)
         return self
-    def divide(self, image:Self):
-        self.image = base.divide(self.image, image.image)
+    def __mul__(self, image_or_value:Union[Self, int]):
+        return ImageObject(self.image.copy()).multiply(image_or_value)
+    def divide(self, image_or_value:Union[Self, int]):
+        if isinstance(image_or_value, int):
+            self.image = base.divide(self.image, image_or_value)
+        else:
+            self.image = base.divide(self.image, image_or_value.image)
         return self
-    def bitwise_and(self, image:Self):
-        self.image = base.bitwise_and(self.image, image.image)
+    def __truediv__(self, image_or_value:Union[Self, int]):
+        return ImageObject(self.image.copy()).divide(image_or_value)
+    def bitwise_and(self, image_or_value:Union[Self, int]):
+        if isinstance(image_or_value, int):
+            self.image = base.bitwise_and(self.image, image_or_value)
+        else:
+            self.image = base.bitwise_and(self.image, image_or_value.image)
         return self
-    def bitwise_or(self, image:Self):
-        self.image = base.bitwise_or(self.image, image.image)
+    def bitwise_or(self, image_or_value:Union[Self, int]):
+        if isinstance(image_or_value, int):
+            self.image = base.bitwise_or(self.image, image_or_value)
+        else:
+            self.image = base.bitwise_or(self.image, image_or_value.image)
         return self
-    def bitwise_xor(self, image:Self):
-        self.image = base.bitwise_xor(self.image, image.image)
+    def bitwise_xor(self, image_or_value:Union[Self]):
+        if isinstance(image_or_value, int):
+            self.image = base.bitwise_xor(self.image, image_or_value)
+        else:
+            self.image = base.bitwise_xor(self.image, image_or_value.image)
         return self
     def bitwise_not(self):
         self.image = base.bitwise_not(self.image)
         return self
+    def __neg__(self):
+        return ImageObject(self.image.copy()).bitwise_not()
     
 class NoiseImageObject(ImageObject):
     def __init__(

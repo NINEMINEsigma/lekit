@@ -310,9 +310,20 @@ class tool_file:
         return get_extension_name(path)
     def get_path(self):
         return self.__file_path
-    def get_filename(self):
-        return get_base_filename(self.__file_path)
+    def get_filename(self, is_without_extension = False):
+        '''
+        if target path is a file, it return filename
+        if target path is a directory, it return top directory name
+        '''
+        if is_without_extension and '.' in self.__file_path:
+            return get_base_filename(self.__file_path)[:-(len(self.get_extension())+1)]
+        elif self.__file_path[-1] == '/' or self.__file_path[-1] == '\\':
+            return get_base_filename(self.__file_path[:-1])
+        else:
+            return get_base_filename(self.__file_path)
     def get_dir(self):
+        return os.path.dirname(self.__file_path)
+    def get_current_dir_name(self):
         return os.path.dirname(self.__file_path)
     
     def is_dir(self):
