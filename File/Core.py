@@ -299,6 +299,10 @@ class tool_file:
         self.data.save(path if path else self.__file_path)
         return self
     
+    def get_size(self) -> int:
+        if self.is_dir():
+            return -1
+        return os.path.getsize(self.__file_path)
     def get_data_type(self):
         return type(self.data)
     def get_extension(self, path:str=None):
@@ -368,6 +372,33 @@ class tool_file:
         for file in self.dir_tool_file_iter():
             file.remove()
         return self
+    def first_file_with_extension(self, extension:str):
+        target_dir = self if self.is_dir() else tool_file(self.get_dir())
+        for file in target_dir.dir_tool_file_iter():
+            if file.is_dir() is False and file.get_extension() == extension:
+                return file
+        return None
+    def first_file(self, pr:Callable[[str], bool]):
+        target_dir = self if self.is_dir() else tool_file(self.get_dir())
+        for file in target_dir.dir_tool_file_iter():
+            if pr(file.get_filename()):
+                return file
+        return None
+    def find_file_with_extension(self, extension:str):
+        target_dir = self if self.is_dir() else tool_file(self.get_dir())
+        result:List[tool_file] = []
+        for file in target_dir.dir_tool_file_iter():
+            if file.is_dir() is False and file.get_extension() == extension:
+                result.append(file)
+        return result
+    def find_file(self, pr:Callable[[str], bool]):
+        target_dir = self if self.is_dir() else tool_file(self.get_dir())
+        result:List[tool_file] = []
+        for file in target_dir.dir_tool_file_iter():
+            if pr(file.get_filename()):
+                result.append(file)
+        return result
+    
     
     def append_text(self, line:str):
         if self.data is str:
@@ -432,7 +463,6 @@ def split_elements(
                 output_callback(current)
         
     return result
-
 
 if __name__ == "__main__":
     a = tool_file("abc/")

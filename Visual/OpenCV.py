@@ -9,47 +9,84 @@ from PIL                import ImageFile, Image
 from lekit.Str.Core     import UnWrapper as Unwrapper2Str
 from lekit.File.Core    import tool_file, Wrapper as Wrapper2File
 
+from lekit.Lang.BaseClass import BaseBehaviour
+
 VideoWriter = base.VideoWriter
+def mp4_with_MPEG4_fourcc() -> int:
+    return VideoWriter.fourcc(*"mp4v")
+def avi_with_Xvid_fourcc() -> int: 
+    return VideoWriter.fourcc(*"XVID")
+def avi_with_DivX_fourcc() -> int:
+    return VideoWriter.fourcc(*"DIVX")
+def avi_with_MJPG_fourcc() -> int:
+    return VideoWriter.fourcc(*"MJPG")
+def mp4_or_avi_with_H264_fourcc() -> int:
+    return VideoWriter.fourcc(*"X264")
+def avi_with_H265_fourcc() -> int:
+    return VideoWriter.fourcc(*"H264")
+def wmv_with_WMV1_fourcc() -> int:
+    return VideoWriter.fourcc(*"WMV1")
+def wmv_with_WMV2_fourcc() -> int:
+    return VideoWriter.fourcc(*"WMV2")
+def oggTheora_with_THEO_fourcc() -> int:
+    return VideoWriter.fourcc(*"THEO")
+def flv_with_FLV1_fourcc() -> int:
+    return VideoWriter.fourcc(*"FLV1")
+class VideoWriterInstance(VideoWriter):
+    def __init__(
+        self, 
+        file_name:  Union[tool_file, str], 
+        fourcc:     int,
+        fps:        float, 
+        frame_size: tuple[int, int],
+        is_color:   bool = True
+        ):
+        super().__init__(Unwrapper2Str(file_name), fourcc, fps, frame_size, is_color)
+    def __del__(self):
+        self.release()
 
 def wait_key(delay:int):
     return base.waitKey(delay)
 def until_esc():
     return wait_key(0)
 
-class light_cv_camera:
-    def __init__(self, index:int = 0):
-        self.capture = base.VideoCapture(index)
-        
+def is_current_key(key:str, *, wait_delay:int = 1):
+    return wait_key(wait_delay) & 0xFF == ord(key[0])
+
+class light_cv_view:
+    def __init__(self, filename_or_index:Union[str, tool_file, int]):
+        self.__capture: base.VideoCapture   = None
+        self.stats:     bool                = True
+        self.retarget(filename_or_index)
+    def __del__(self):
+        self.release()
+    
+    def __bool__(self):
+        return self.stats
+    
     def is_open(self):
-        return self.capture.isOpened()
+        return self.__capture.isOpened()
         
     def release(self):
-        self.capture.release()
-    def retarget(self, index:int = 0):
-        self.capture.release()
-        self.capture = base.VideoCapture(index)
+        if self.__capture is not None:
+            self.__capture.release()
+    def retarget(self, filename_or_index:Union[str, tool_file, int]):
+        self.release()
+        if isinstance(filename_or_index, int):
+            self.__capture = base.VideoCapture(filename_or_index)
+        else:
+            self.__capture = base.VideoCapture(Unwrapper2Str(filename_or_index))
         return self
     
-    def current_frame(self):
-        stats, frame = self.capture.read()
-        if stats:
+    def next_frame(self) -> MatLike:
+        self.stats, frame =self.__capture.read()
+        if self.stats:
             return frame
         else:
             return None
-    def current_stats(self):
-        stats, _ = self.capture.read()
-        return stats
-    
-    def save_current_frame(self, file_name:Union[str, tool_file] = "current.png"):
-        base.imwrite(Unwrapper2Str(file_name), self.current_frame())
-        return self
-    def show_current_frame(self, window_name:str = 'frame'):
-        base.imshow(window_name, self.current_frame())
-        base.waitKey(0)
-        return self
     
     def get_captrue_info(self, id:int):
-        return self.capture.get(id)
+        return self.__capture.get(id)
     def get_prop_pos_msec(self):
         return self.get_captrue_info(0)
     def get_prop_pos_frames(self):
@@ -86,7 +123,7 @@ class light_cv_camera:
         return self.get_captrue_info(16)
         
     def setup_capture(self, id:int, value):
-        self.capture.set(id, value)
+        self.__capture.set(id, value)
         return self
     def set_prop_pos_msec(self, value:int):
         return self.setup_capture(0, value)
@@ -126,39 +163,38 @@ class light_cv_camera:
         return self.setup_capture(17, value)
     
     @property
-    def frame_size(self):
+    def frame_size(self) -> Tuple[float, float]:
         return self.get_prop_frame_width(), self.get_prop_frame_height()
     
-    def set_window_rect(self, weight:int, height:int):
-        self.set_prop_frame_width(weight)
-        self.set_prop_frame_height(height)
-        return self
-    def get_window_rect(self):
-        return self.get_prop_frame_width(), self.get_prop_frame_height()
+class light_cv_camera(light_cv_view):
+    def __init__(self, index:int = 0):
+        self.writer:    VideoWriter = None
+        super().__init__(int(index))
     
-    def set_window_size(self, weight:int, height:int):
-        return self.set_window_rect(weight, height)
-    def set_window_name(self, name:str):
-        base.namedWindow(name)
-        return self
-
-    def get_frame(self):
-        _, frame = self.capture.read()
-        return frame
+    @override
+    def release(self):
+        super().release()
+        if self.writer is not None:
+            self.writer.release()
+    
+    def current_frame(self):
+        return self.next_frame()
     
     def recording(
         self, 
-        pr:         Callable[[], bool], 
-        filename:   Union[str, tool_file], 
-        writer:     VideoWriter
+        stop_pr:    Callable[[], bool], 
+        writer:     VideoWriter,
         ):
-        filename:   str = Unwrapper2Str(filename)
-        
+        self.writer = writer
         while self.is_open():
-            if pr():
+            if stop_pr():
                 break
-            writer.write(self.current_frame())
-        
+            frame = self.current_frame()
+            base.imshow("__recording__", frame)
+            writer.write(frame)
+        base.destroyWindow("__recording__")
+        return self
+
 class ImageObject:
     def __init__(
         self,
@@ -599,6 +635,7 @@ def Wrapper(image:Optional[Union[
 class light_cv_window:
     def __init__(self, name:str):
         self.__my_window_name = name
+        base.namedWindow(self.__my_window_name)
     def __del__(self):
         self.destroy()
 
@@ -631,7 +668,8 @@ class light_cv_window:
     def get_window_property(self, prop_id:int):
         return base.getWindowProperty(self.__my_window_name, prop_id)
     def set_window_property(self, prop_id:int, prop_value:int):
-        return base.setWindowProperty(self.__my_window_name, prop_id, prop_value)
+        base.setWindowProperty(self.__my_window_name, prop_id, prop_value)
+        return self
     def get_prop_frame_width(self):
         return self.window_rect[2]
     def get_prop_frame_height(self):
@@ -639,21 +677,27 @@ class light_cv_window:
     def is_full_window(self):
         return base.getWindowProperty(self.__my_window_name, base.WINDOW_FULLSCREEN) > 0
     def set_full_window(self):
-        return base.setWindowProperty(self.__my_window_name, base.WINDOW_FULLSCREEN, 1)
+        base.setWindowProperty(self.__my_window_name, base.WINDOW_FULLSCREEN, 1)
+        return self
     def set_normal_window(self):
-        return base.setWindowProperty(self.__my_window_name, base.WINDOW_FULLSCREEN, 0)
+        base.setWindowProperty(self.__my_window_name, base.WINDOW_FULLSCREEN, 0)
+        return self
     def is_using_openGL(self):
         return base.getWindowProperty(self.__my_window_name, base.WINDOW_OPENGL) > 0
     def set_using_openGL(self):
-        return base.setWindowProperty(self.__my_window_name, base.WINDOW_OPENGL, 1)
+        base.setWindowProperty(self.__my_window_name, base.WINDOW_OPENGL, 1)
+        return self
     def set_not_using_openGL(self):
-        return base.setWindowProperty(self.__my_window_name, base.WINDOW_OPENGL, 0)
+        base.setWindowProperty(self.__my_window_name, base.WINDOW_OPENGL, 0)
+        return self
     def is_autosize(self):
         return base.getWindowProperty(self.__my_window_name, base.WINDOW_AUTOSIZE) > 0
     def set_autosize(self):
-        return base.setWindowProperty(self.__my_window_name, base.WINDOW_AUTOSIZE, 1)
+        base.setWindowProperty(self.__my_window_name, base.WINDOW_AUTOSIZE, 1)
+        return self
     def set_not_autosize(self):
-        return base.setWindowProperty(self.__my_window_name, base.WINDOW_AUTOSIZE, 0)
+        base.setWindowProperty(self.__my_window_name, base.WINDOW_AUTOSIZE, 0)
+        return self
     
     def set_window_rect(self, x:int, y:int, weight:int, height:int):
         base.moveWindow(self.__my_window_name, x, y)
