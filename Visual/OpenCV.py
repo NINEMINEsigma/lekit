@@ -7,7 +7,7 @@ import numpy            as     np
 from PIL                import ImageFile, Image
 
 from lekit.Str.Core     import UnWrapper as Unwrapper2Str
-from lekit.File.Core    import tool_file
+from lekit.File.Core    import tool_file, Wrapper as Wrapper2File
 
 VideoWriter = base.VideoWriter
 
@@ -238,17 +238,17 @@ class ImageObject:
         return self
 
     @property
-    def dimension(self):
+    def dimension(self) -> int:
         return self.image.ndim
     
     @property
     def shape(self):
         return self.image.shape
     @property
-    def height(self):
+    def height(self) -> int:
         return self.shape[0]
     @property
-    def width(self):
+    def width(self) -> int:
         return self.shape[1]
 
     def is_enable(self):
@@ -265,6 +265,7 @@ class ImageObject:
         image:          Optional[Union[
             str,
             tool_file, 
+            Self,
             MatLike, 
             np.ndarray, 
             ImageFile.ImageFile,
@@ -274,8 +275,10 @@ class ImageObject:
         ):
         """加载图片"""
         if image is None:
-            self.image = None
+            self.__image = None
             return self
+        elif isinstance(image, type(self)):
+            self.__image = image.image
         elif isinstance(image, MatLike):
             self.__image = image
         elif isinstance(image, np.ndarray):
@@ -287,8 +290,10 @@ class ImageObject:
         else:
             self.__image = base.imread(Unwrapper2Str(image), flags)
         return self
-    def save_image(self, save_path:Union[str, tool_file]):
+    def save_image(self, save_path:Union[str, tool_file], is_path_must_exist = False):
         """保存图片"""
+        if is_path_must_exist:
+            Wrapper2File(save_path).try_create_parent_path()
         if self.is_enable():
             base.imwrite(Unwrapper2Str(save_path), self.image)
         return self
@@ -480,6 +485,61 @@ class ImageObject:
     def operator_cv(self, func:Callable[[MatLike], Any], *args, **kwargs):
         func(self.image, *args, **kwargs)
         return self
+
+    def stack(self, *args:Self, **kwargs) -> Self:
+        images = [ image for image in args]
+        images.append(self)
+        return ImageObject(np.stack([np.uint8(image.image) for image in images], *args, **kwargs))
+    def vstack(self, *args:Self) -> Self:
+        images = [ image for image in args]
+        images.append(self)
+        return ImageObject(np.vstack([np.uint8(image.image) for image in images]))
+    def hstack(self, *args:Self) -> Self:
+        images = [ image for image in args]
+        images.append(self)
+        return ImageObject(np.hstack([np.uint8(image.image) for image in images]))
+    
+    def add(self, image:Self):
+        self.image = base.add(self.image, image.image)
+        return self
+    def __add__(self, image:Self):
+        return ImageObject(self.image.copy()).add(image)
+    def subtract(self, image:Self):
+        self.image = base.subtract(self.image, image.image)
+        return self
+    def multiply(self, image:Self):
+        self.image = base.multiply(self.image, image.image)
+        return self
+    def divide(self, image:Self):
+        self.image = base.divide(self.image, image.image)
+        return self
+    def bitwise_and(self, image:Self):
+        self.image = base.bitwise_and(self.image, image.image)
+        return self
+    def bitwise_or(self, image:Self):
+        self.image = base.bitwise_or(self.image, image.image)
+        return self
+    def bitwise_xor(self, image:Self):
+        self.image = base.bitwise_xor(self.image, image.image)
+        return self
+    def bitwise_not(self):
+        self.image = base.bitwise_not(self.image)
+        return self
+    
+class NoiseImageObject(ImageObject):
+    def __init__(
+        self,
+        height:     int,
+        weight:     int,
+        *,
+        mean:       float   = 0,
+        sigma:      float   = 25,
+        dtype               = np.uint8
+        ):
+        noise = np.zeros((height,weight),dtype=dtype)
+        base.randn(noise, mean, sigma)
+        noise_bgr = base.cvtColor(noise, base.COLOR_GRAY2BGR)
+        super().__init__(noise_bgr)
 
 def Unwrapper(image:Optional[Union[
             str,

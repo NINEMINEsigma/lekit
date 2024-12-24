@@ -1,5 +1,5 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from Str.Core import *
+from lekit.Str.Core import *
 
 local_message = "<init>"
 

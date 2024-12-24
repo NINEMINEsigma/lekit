@@ -4,7 +4,6 @@ import pandas as pd
 import os
 import sys
 import pickle
-import random
 
 from lekit.Str.Core                     import UnWrapper, list_byte_to_string
 from lekit.Lang                         import BaseClass

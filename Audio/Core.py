@@ -2,9 +2,6 @@ import sounddevice as base
 import soundfile as sf
 from File.Core import tool_file
 
-def load_audio(file_path):
-    sf.load
-
 def list_devices():
     """
     列出所有音频设备
