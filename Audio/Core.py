@@ -1,6 +1,6 @@
 import sounddevice as base
 import soundfile as sf
-from File.Core import tool_file
+from lekit.File.Core import tool_file
 
 def list_devices():
     """

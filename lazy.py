@@ -1,7 +1,23 @@
 from typing             import *
 from lekit.File.Core    import tool_file
-from lekit.Str.Core     import UnWrapper
+from lekit.Str.Core     import UnWrapper as UnWrapper2Str
+
 import os
+
+try:
+    import numpy as np
+except ImportError:
+    pass
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    pass
+
+try:
+    import pandas as pd
+except ImportError:
+    pass
 
 const_config_file = "config.json"
 
@@ -17,7 +33,7 @@ class GlobalConfig:
         # build up data folder
         if data_dir is None:
             data_dir = tool_file(os.path.abspath('.'))
-        self.data_dir:tool_file = data_dir if isinstance(data_dir, tool_file) else tool_file(UnWrapper(data_dir))
+        self.data_dir:tool_file = data_dir if isinstance(data_dir, tool_file) else tool_file(UnWrapper2Str(data_dir))
         if self.data_dir.exists() is False:
             if is_try_create_data_dir:
                 self.data_dir.try_create_parent_path()
@@ -114,7 +130,7 @@ class GlobalConfig:
         print(self.__data_pair)
                 
     def Log(self, message_type:str, message):
-        print(f"{message_type}: {UnWrapper(message)}")
+        print(f"{message_type}: {UnWrapper2Str(message)}")
         return self
     def LogMessage(self, message:str):
         self.Log("Message", message)

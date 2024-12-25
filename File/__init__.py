@@ -19,6 +19,6 @@ try:
     from PIL                                            import Image as _, ImageFile as _
     from docx                                           import Document as _
     from docx.document                                  import Document as _
+    from lekit.File.Core import *
 except ImportError as ex:
     InternalImportingThrow("File Core", ["json", "shutil", "pandas", "os", "sys", "pickle", "pathlib", "pydub", "PIL", "docx"], ex)
-from lekit.File.Core import *

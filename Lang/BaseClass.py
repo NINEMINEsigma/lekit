@@ -49,3 +49,9 @@ def split_elements(
         result.append(input[start_index:])
     
     return result
+
+def space_lines(line:int = 1):
+    print('\n' * line, end="")
+
+
+

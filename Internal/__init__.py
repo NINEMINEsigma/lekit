@@ -23,4 +23,4 @@ def InternalImportingThrow(
     messageBase:    str = "{module} Module requires internal lekit package: {required}.",
     ):
         requierds_str = ",".join([f"<{r}>" for r in requierds])
-        raise ImportError(f"Internal lekit package is not installed.\n{messageBase.format_map(dict(module=moduleName, required=requierds_str))}")
+        print(f"Internal lekit package is not installed.\n{messageBase.format_map(dict(module=moduleName, required=requierds_str))}")

@@ -12,15 +12,22 @@ try:
     import pandas               as     _
     import cv2 as _
     import numpy                as _
+    from lekit.Visual.Core import *
 except ImportError as ex:
     ImportingThrow(ex, "Visual-Core", ["matplotlib", "seaborn", "pandas", "opencv-python", "numpy"])
-from lekit.Visual.Core import *
 
 # Import OpenCV.py
 try:
     import numpy            as     _
     from PIL                import ImageFile as _
+    from lekit.Visual.OpenCV import *
 except ImportError as ex:
     ImportingThrow(ex, "OpenCV", ["numpy", "Pillow"])
-from lekit.Visual.OpenCV import *
 
+# Import WordCloud.py
+try:
+    from pyecharts.charts import WordCloud as _
+    from pyecharts import options as _
+    from lekit.Visual.WordCloud import *
+except ImportError as ex:
+    ImportingThrow(ex, "WordCloud", ["wordcloud"])

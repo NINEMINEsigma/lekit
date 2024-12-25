@@ -1,8 +1,15 @@
-import requests as base
-import urllib3
+from typing             import *
+import requests         as     base
+from requests.adapters  import HTTPAdapter
+import                         urllib3
 
 class light_requests(object):
-    def __init__(self, retries=3, backoff_factor=0.3, status_forcelist=(500, 502, 504)):
+    def __init__(
+        self,
+        retries:            int                     = 3,
+        backoff_factor:     int                     = 0.3,
+        status_forcelist:   Tuple[int, int, int]    = (500, 502, 504)
+        ):
         self.session = base.Session()
         retry_strategy = urllib3.Retry(
             total=retries,
@@ -10,35 +17,62 @@ class light_requests(object):
             allowed_methods=["HEAD", "GET", "OPTIONS"],
             backoff_factor=backoff_factor,
         )
-        adapter = base.adapters.HTTPAdapter(max_retries=retry_strategy)
+        adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
     
-    def get(self, url, timeout=30, headers=None, **kwargs):
+    def get(
+        self,
+        url:        str,
+        timeout:    int = 30,
+        headers         = None, 
+        **kwargs
+        ):
         return self.session.get(url, timeout=timeout, headers=headers, **kwargs)
     
-    def post_data(self, url, data=None, timeout=30, **kwargs):
+    def post_data(
+        self,
+        url:        str,
+        data:       Optional[Any] = None,
+        timeout:    int           = 30, 
+        **kwargs
+        ):
         return self.session.post(url, data=data, timeout=timeout, **kwargs)
     
-    def post_json(self, url, json=None, timeout=30, **kwargs):
+    def post_json(
+        self, 
+        url:        str,
+        json:       Optional[Any] = None, 
+        timeout:    int           = 30,
+        **kwargs
+        ):
         return self.session.post(url, json=json, timeout=timeout, **kwargs)
     
-    def put(self, url, data=None, timeout=30, **kwargs):
+    def put(
+        self, 
+        url:        str,
+        data:       Optional[Any] = None,
+        timeout:    int           =30,
+        **kwargs
+        ):
         return self.session.put(url, data=data, timeout=timeout, **kwargs)
     
-    def delete(self, url, timeout=30, **kwargs):
+    def delete(
+        self, 
+        url:        str,
+        timeout:    int = 30,
+        **kwargs
+        ):
         return self.session.delete(url, timeout=timeout, **kwargs)
     
 
 if __name__ == "__main__":
     # Example usage
     light = light_requests()
-    url = 'http://localhost:8080'
+    url = r"https://www.baidu.com"
     
     response = light.get(url)
-    response = light.put(url)
-    response = light.post_json(url,{'one':'two'})
-    response = light.put(url)
-    response = light.post_data(url,{'key':'value'})
-    response = light.get(url)
-    response = light.put(url)
+    print(response.status_code)
+    print(response.text[:200])
+    
+    

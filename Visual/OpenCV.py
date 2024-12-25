@@ -446,7 +446,45 @@ class ImageObject:
         """双向翻转图片"""
         return self.flip(-1)
 
+    # 色彩空间猜测
+    def guess_color_space(self) -> Optional[str]:
+        """猜测色彩空间"""
+        if self.is_invalid():
+            return None
+        image = self.image
+        # 计算每个通道的像素值分布
+        hist_b = base.calcHist([image], [0], None, [256], [0, 256])
+        hist_g = base.calcHist([image], [1], None, [256], [0, 256])
+        hist_r = base.calcHist([image], [2], None, [256], [0, 256])
+
+        # 计算每个通道的像素值总和
+        sum_b = np.sum(hist_b)
+        sum_g = np.sum(hist_g)
+        sum_r = np.sum(hist_r)
+
+        # 根据像素值总和判断色彩空间
+        if sum_b > sum_g and sum_b > sum_r:
+            #print("The image might be in BGR color space.")
+            return "BGR"
+        elif sum_g > sum_b and sum_g > sum_r:
+            #print("The image might be in GRAY color space.")
+            return "GRAY"
+        else:
+            #print("The image might be in RGB color space.")
+            return "RGB"
+
     # 颜色转化
+    def get_convert(self, color_convert:int):
+        """颜色转化"""
+        if self.is_invalid():
+            return None
+        return base.cvtColor(self.image, color_convert)
+    def convert_to(self, color_convert:int):
+        """颜色转化"""
+        if self.is_invalid():
+            return None
+        self.image = self.get_convert(color_convert)
+    
     def is_grayscale(self):
         return self.dimension == 2
     def get_grayscale(self):
@@ -457,6 +495,38 @@ class ImageObject:
         """将图片转换为灰度图"""
         self.image = self.get_grayscale()
         return self
+
+    def get_convert_flag(
+        self, 
+        targetColorTypeName:Literal[
+            "BGR", "RGB", "GRAY", "YCrCb"
+            ]
+        ) -> Optional[int]:
+        """获取颜色转化标志"""
+        flag = self.guess_color_space()
+        if flag is None:
+            return None
+        
+        if targetColorTypeName == "BGR":
+            if flag == "RGB":
+                return base.COLOR_RGB2BGR
+            elif flag == "GRAY":
+                return base.COLOR_GRAY2BGR
+            elif flag == "YCrCb":
+                return base.COLOR_YCrCb2BGR
+        elif targetColorTypeName == "RGB":
+            if flag == "BGR":
+                return base.COLOR_BGR2RGB
+            elif flag == "GRAY":
+                return base.COLOR_GRAY2RGB
+            elif flag == "YCrCb":
+                return base.COLOR_YCrCb2RGB
+        elif targetColorTypeName == "GRAY":
+            if flag == "RGB":
+                return base.COLOR_RGB2GRAY
+            elif flag == "RGB":
+                return base.COLOR_BGR2GRAY
+        return None
 
     # 原址裁切
     def sub_image(self, x:int, y:int ,width:int ,height:int):

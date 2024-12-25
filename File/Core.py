@@ -422,12 +422,15 @@ class tool_file:
     def must_exists_path(self):
         return self.must_exists_as_new()
         
-    def make_file_inside(self, data:Self):
+    def make_file_inside(self, data:Self, is_delete_source = False):
         if self.is_dir() is False:
             raise Exception("Cannot make file inside a file, because this object target is not a directory")
         result = self|data.get_filename()
-        data.copy(result)
-        return result
+        if is_delete_source:
+            data.move(result)
+        else:
+            data.copy(result)
+        return self
     
 def Wrapper(file) -> tool_file:
     if isinstance(file, tool_file):
@@ -463,6 +466,8 @@ def split_elements(
                 output_callback(current)
         
     return result
+
+tool_file_or_str = Union[tool_file, str]
 
 if __name__ == "__main__":
     a = tool_file("abc/")

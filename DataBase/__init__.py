@@ -9,15 +9,14 @@ except ImportError:
 
 # Import Core.py
 try:
-    pass
+    from lekit.DataBase.Core import *
 except ImportError as ex:
     ImportingThrow(ex, "DataBase Core", [])
-from lekit.DataBase.Core import *
 
 
 # Import Core.py
 try:
     import sqlite3 as _
+    from lekit.DataBase.light_sqlite import *
 except ImportError as ex:
     ImportingThrow(ex, "light_sqlite", ["sqlite3"])
-from lekit.DataBase.light_sqlite import *
