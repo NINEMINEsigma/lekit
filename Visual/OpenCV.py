@@ -9,8 +9,6 @@ from PIL                import ImageFile, Image
 from lekit.Str.Core     import UnWrapper as Unwrapper2Str
 from lekit.File.Core    import tool_file, Wrapper as Wrapper2File
 
-from lekit.Lang.BaseClass import BaseBehaviour
-
 VideoWriter = base.VideoWriter
 def mp4_with_MPEG4_fourcc() -> int:
     return VideoWriter.fourcc(*"mp4v")
@@ -346,7 +344,7 @@ class ImageObject:
         if self.is_invalid():
             return self
         if self.camera is not None:
-            while wait_key(1) & 0xFF != ord(str(delay)[0]) and self.camera is not None:
+            while (wait_key(1) & 0xFF != ord(str(delay)[0])) and self.camera is not None:
                 # dont delete this line, self.image is camera flame now, see<self.current = None>
                 self.current = self.image
                 if image_show_func is not None:
@@ -608,6 +606,9 @@ class ImageObject:
         images = [ image for image in args]
         images.append(self)
         return ImageObject(np.hstack([np.uint8(image.image) for image in images]))
+    
+    def merge_with_blending(self, other:Self, weights:Tuple[float, float]):
+        return ImageObject(base.addWeighted(self.image, weights[0], other.image, weights[1], 0))
     
     def add(self, image_or_value:Union[Self, int]):
         if isinstance(image_or_value, int):
