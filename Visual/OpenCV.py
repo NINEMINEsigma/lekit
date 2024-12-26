@@ -675,10 +675,25 @@ class NoiseImageObject(ImageObject):
         sigma:      float   = 25,
         dtype               = np.uint8
         ):
-        noise = np.zeros((height,weight),dtype=dtype)
+        super().__init__(NoiseImageObject.get_new_noise(
+            None, height, weight, mean=mean, sigma=sigma, dtype=dtype
+            ))
+    
+    @classmethod
+    def get_new_noise(
+        raw_image:  Optional[MatLike],
+        height:     int,
+        weight:     int,
+        *,
+        mean:       float   = 0,
+        sigma:      float   = 25,
+        dtype               = np.uint8
+        ) -> MatLike:
+        noise = raw_image
+        if noise is None:
+            noise = np.zeros((height, weight), dtype=dtype)
         base.randn(noise, mean, sigma)
-        noise_bgr = base.cvtColor(noise, base.COLOR_GRAY2BGR)
-        super().__init__(noise_bgr)
+        return base.cvtColor(noise, base.COLOR_GRAY2BGR)
 
 def Unwrapper(image:Optional[Union[
             str,
@@ -815,6 +830,20 @@ if __name__ == "__main__":
     img_obj.convert_to_grayscale()
     img_obj.save_image("path/to/save/image.jpg")
 
+# Override tool_file to tool_file_ex
 
-
+class tool_file_cvex(tool_file):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    @override
+    def load_as_image(self) -> ImageObject:
+        self.data = ImageObject(self.get_path())
+        return self.data
+    
+    @override
+    def save(self, path = None):
+        image:ImageObject   = self.data
+        image.save_image(path if path is not None else self.get_path())
+        return self
 

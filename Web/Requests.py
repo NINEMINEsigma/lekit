@@ -8,7 +8,7 @@ class light_requests(object):
         self,
         retries:            int                     = 3,
         backoff_factor:     int                     = 0.3,
-        status_forcelist:   Tuple[int, int, int]    = (500, 502, 504)
+        status_forcelist:   tuple                   = (500, 502, 504)
         ):
         self.session = base.Session()
         retry_strategy = urllib3.Retry(
