@@ -9,4 +9,4 @@ try:
     from keras import api as _
     from lekit.ML.Keras import *
 except ImportError as ex:
-    ImportingThrow(ex, "Keras", ["keras"])
+    ImportingThrow(ex, "Keras", ["keras(or tensorflow)"])
