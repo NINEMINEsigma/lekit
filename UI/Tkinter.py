@@ -31,6 +31,9 @@ class light_tk_window:
         self.__title = title
         self.window.title(title)
         return self.__title
+    def set_title(self, title:str):
+        self.title = title
+        return self
     
     def build_element(
         self,
@@ -51,8 +54,14 @@ class light_tk_window:
         return self.build_element(base.Label, grid=grid, **kwargs)
     def make_text(self, grid:Optional[grid_position]=None, **kwargs) -> base.Text:
         return self.build_element(base.Text, grid=grid, **kwargs)
-    def make_canvas(self, grid:Optional[grid_position]=None, **kwargs) -> base.Canvas:
-        return self.build_element(base.Canvas, grid=grid, **kwargs)
+    def make_canvas(
+        self,
+        width:float,
+        height:float, 
+        grid:Optional[grid_position]=None,
+        **kwargs
+        ) -> base.Canvas:
+        return self.build_element(base.Canvas, width=width, height=height, grid=grid, **kwargs)
     def make_frame(self, grid:Optional[grid_position]=None, **kwargs) -> base.Frame:
         return self.build_element(base.Frame, grid=grid, **kwargs)
     def make_menu(self, grid:Optional[grid_position]=None, **kwargs) -> base.Menu:

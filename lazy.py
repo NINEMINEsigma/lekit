@@ -19,6 +19,12 @@ try:
 except ImportError:
     pass
 
+try:
+    from PIL import Image as PILImage
+    from PIL import ImageDraw as PILImageDraw
+except ImportError:
+    pass
+
 const_config_file = "config.json"
 
 class GlobalConfig:
