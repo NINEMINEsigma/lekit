@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing                         import *
 from lekit.Lang.Reflection          import light_reflection
+import                                     jieba
 
 def limit_str(data, max_length=50):
     s:str = data if data is str else str(data)
@@ -18,9 +19,18 @@ def limit_str(data, max_length=50):
 def link(symbol:str, strs:list):
     return symbol.join(strs)
 
+def list_byte_to_list_string(lines:List[bytes], encoding='utf-8') -> List[str]:
+    return [line.decode(encoding) for line in lines]
+    
+def list_byte_to_string(lines:List[bytes], encoding='utf-8') -> str:
+    return "".join(list_byte_to_list_string(lines, encoding))
+    
 class light_str:
-    def __init__(self, s:str=""):
-        self._str = s
+    def __init__(self, s:Union[str, List[bytes]] = ""):
+        if isinstance(s, str):
+            self._str = s
+        elif isinstance(s, list):
+            self._str = list_byte_to_string(s)  
     
     def length(self):
         return len(self._str)
@@ -70,7 +80,21 @@ class light_str:
     def __str__(self):
         return self._str
 
+static_is_enable_unwrapper_none2none = False
+def enable_unwrapper_none2none():
+    global static_is_enable_unwrapper_none2none
+    static_is_enable_unwrapper_none2none = True
+def disable_unwrapper_none2none():
+    global static_is_enable_unwrapper_none2none
+    static_is_enable_unwrapper_none2none = False
+
 def UnWrapper(from_) -> str:
+    if from_ is None:
+        if static_is_enable_unwrapper_none2none:
+            return "null"
+        else:
+            raise ValueError("None is not support")
+    
     if isinstance(from_, str):
         return from_
     elif isinstance(from_, Path):
@@ -114,12 +138,12 @@ def Combine(*args) -> str:
         for current in args:
             result += UnWrapper(current)
     
-def list_byte_to_list_string(lines:List[bytes], encoding='utf-8') -> List[str]:
-    return [line.decode(encoding) for line in lines]
-    
-def list_byte_to_string(lines:List[bytes], encoding='utf-8') -> str:
-    return "".join(list_byte_to_list_string(lines, encoding))
-    
-    
+def word_segmentation(
+    sentence:   Union[str, light_str, Any], 
+    cut_all:    bool                    = False,
+    HMM:        bool                    = True,
+    use_paddle: bool                    = False
+    ) -> Sequence[Optional[Union[Any, str]]]:
+    return jieba.dt.cut(UnWrapper(sentence), cut_all=cut_all, HMM=HMM, use_paddle=use_paddle)
     
     

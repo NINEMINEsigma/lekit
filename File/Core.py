@@ -30,20 +30,20 @@ def is_binary_file(file_path: str) -> bool:
     except Exception as e:
         print(f"Error: {e}")
         return False
-    
+
 def get_extension_name(file:str):
         return os.path.splitext(file)[1][1:]
-    
+
 def get_base_filename(file:str):
     return os.path.basename(file)
-    
+
 def is_image_file(file_path:str):
     return get_extension_name(file_path) in image_file_type
 
 class tool_file:
-    
+
     __datas_lit_key:    Literal["model"] = "model"
-    
+
     def __init__(self, file_path:str, file_mode:str=None, *args, **kwargs):
         self.__file_path:   str             = file_path
         self.datas:         Dict[str, Any]  = {}
@@ -66,7 +66,7 @@ class tool_file:
         return iter(self.datas)
     def __len__(self):
         return len(self.datas)
-        
+
     def __or__(self, other):
         if other is None:
             return tool_file(self.get_path() if self.is_dir() else self.get_path()+"\\")
@@ -76,12 +76,12 @@ class tool_file:
         self.close()
         temp = self.__or__(other)
         self.__file_path = temp.get_path()
-        
+
     def to_path(self):
         return Path(self.__file_path)
     def __Path__(self):
         return Path(self.__file_path)
-        
+
     def create(self):
         if self.exists() == False:
             if self.is_dir():
@@ -133,7 +133,7 @@ class tool_file:
         os.rename(self.__file_path, new_current_path)
         self.__file_path = new_current_path
         return self
-        
+
     def refresh(self):
         self.load()
         return self
@@ -151,7 +151,7 @@ class tool_file:
         return self.__file
     def is_open(self)->bool:
         return self.__file
-        
+
     def load(self):
         if self.__file_path is None:
             raise FileNotFoundError("file path is none")
@@ -298,7 +298,7 @@ class tool_file:
             table.cell(0, 0).text = self.data
         self.data.save(path if path else self.__file_path)
         return self
-    
+
     def get_size(self) -> int:
         if self.is_dir():
             return -1
@@ -329,7 +329,7 @@ class tool_file:
         return os.path.dirname(self.__file_path)
     def get_current_dir_name(self):
         return os.path.dirname(self.__file_path)
-    
+
     def is_dir(self):
         if self.__file_path[-1] == '\\' or self.get_path()[-1] == '/':
             return True
@@ -341,7 +341,7 @@ class tool_file:
         return is_binary_file(self.__file)
     def is_image(self):
          return is_image_file(self.__file_path)
-    
+
     def try_create_parent_path(self):
         dir_path = os.path.dirname(self.__file_path)
         if dir_path == '':
@@ -398,8 +398,7 @@ class tool_file:
             if pr(file.get_filename()):
                 result.append(file)
         return result
-    
-    
+
     def append_text(self, line:str):
         if self.data is str:
             self.data = self.data + line
@@ -408,12 +407,12 @@ class tool_file:
         else:
             raise TypeError(f"Unsupported data type for {sys._getframe().f_code.co_name}")
         return self
-    
+
     def bool(self):
         return self.exists()
     def __bool__(self):
         return self.exists()
-    
+
     def must_exists_as_new(self):
         self.close()
         self.try_create_parent_path()
@@ -421,7 +420,7 @@ class tool_file:
         return self
     def must_exists_path(self):
         return self.must_exists_as_new()
-        
+
     def make_file_inside(self, data:Self, is_delete_source = False):
         if self.is_dir() is False:
             raise Exception("Cannot make file inside a file, because this object target is not a directory")
@@ -431,7 +430,40 @@ class tool_file:
         else:
             data.copy(result)
         return self
-    
+
+    @property
+    def extension(self):
+        if self.is_dir():
+            return None
+        return self.get_extension()
+    @property
+    def filename(self):
+        if self.is_dir():
+            return None
+        return self.get_filename(True)
+    @property
+    def dirname(self):
+        if self.is_dir():
+            return self.get_current_dir_name()
+        return None
+    @property
+    def dirpath(self):
+        if self.is_dir():
+            return self.get_current_dir_name()
+        return None
+    @property
+    def shortname(self):
+        return self.get_filename(False)
+    @property
+    def fullpath(self):
+        return self.get_path()
+
+    def make_lib_path(self) -> Path:
+        return Path(self.__file_path)
+
+    def in_extensions(self, *args:str) -> bool:
+        return self.get_extension() in args
+
 def Wrapper(file) -> tool_file:
     if isinstance(file, tool_file):
         return file
@@ -439,8 +471,8 @@ def Wrapper(file) -> tool_file:
         return tool_file(UnWrapper(file))
 
 def split_elements(
-    file:               Union[tool_file, str], 
-    *,  
+    file:               Union[tool_file, str],
+    *,
     ratios:             List[float]                                 = [1,1],
     pr:                 Optional[Callable[[tool_file], bool]]       = None,
     shuffler:           Optional[Callable[[List[tool_file]], None]] = None,
@@ -464,7 +496,7 @@ def split_elements(
             current = output_dirs[i].make_file_inside(file)
             if output_callback:
                 output_callback(current)
-        
+
     return result
 
 tool_file_or_str = Union[tool_file, str]
@@ -474,6 +506,5 @@ if __name__ == "__main__":
     b = tool_file("a.x")
     c = a|b
     print(c.get_path())
-    
-    
-    
+
+

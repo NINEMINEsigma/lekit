@@ -64,8 +64,9 @@ class light_llama_core(abs_llm_core):
             self.hestroy_message_list.append(make_assistant_prompt(result.content))
             self.last_result = result
         except ValueError:
-            self.pop_front_hestory()
-            self.pop_hestroy()
+            #self.pop_front_hestory()
+            #self.pop_hestroy()
+            self.clear_hestroy()
             self.__call__(message)
         return self.last_result
     
@@ -328,7 +329,7 @@ def make_llama_functioncall(
         tool_choice=tool_choice_name,
         **kwargs)
 
-class runnable_llama_structured_call(Callable[[Union[str, MessageObject], Union[Dict, BaseModel]]]):
+class runnable_llama_structured_call(Callable[[Union[str, MessageObject]], Union[Dict, BaseModel]]):
     def __init__(
             self, 
             core:           light_llama_core,

@@ -15,6 +15,7 @@ except ImportError:
 # Import Core.py
 try:
     from pathlib import Path as _
+    import jieba as _
     from lekit.Str.Core import *
 except ImportError as ex:
     ImportingThrow(ex, "String-Core", ["pathlib"])
