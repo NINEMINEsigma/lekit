@@ -13,6 +13,11 @@ from keras.api.models import (
     Model                       as     KerasBaseModel,
     model_from_json             as     load_keras_model_from_json
 )
+from lekit.ML.KerasInternal.VerboseType import *
+from lekit.ML.KerasInternal.LossType    import *
+
+from tensorflow                 import Tensor
+from keras.api.callbacks        import History as KerasHistory
 from keras.api.optimizers       import Optimizer
 from keras.api                  import losses, metrics
 from keras.api.layers           import Layer
@@ -21,72 +26,7 @@ from keras.api.metrics          import Metric
 from keras.api.callbacks        import Callback as KerasCallback
 from keras.api.initializers     import Initializer
 
-losses_type     = TypeVar('losses_type', Union[
-    Loss,
-    Union[
-    losses.CTC,
-    losses.BinaryCrossentropy,
-    losses.BinaryFocalCrossentropy,
-    losses.CategoricalCrossentropy,
-    losses.CategoricalFocalCrossentropy,
-    losses.CategoricalHinge,
-    losses.Circle,
-    losses.CosineSimilarity,
-    losses.Dice,
-    losses.Hinge,
-    losses.Huber,
-    losses.KLDivergence,
-    losses.LogCosh,
-    losses.MeanAbsoluteError,
-    losses.MeanAbsolutePercentageError,
-    losses.MeanSquaredError,
-    losses.MeanSquaredLogarithmicError,
-    losses.Poisson,
-    losses.SparseCategoricalCrossentropy,
-    losses.SquaredHinge,
-    losses.Tversky,
-    losses.binary_crossentropy,
-    losses.binary_focal_crossentropy,
-    losses.categorical_crossentropy,
-    losses.categorical_focal_crossentropy,
-    losses.categorical_hinge,
-    losses.circle,
-    losses.cosine_similarity,
-    losses.ctc,
-    losses.dice,
-    losses.hinge,
-    losses.huber,
-    losses.kl_divergence,
-    losses.log_cosh,
-    losses.mean_absolute_error,
-    losses.mean_absolute_percentage_error,
-    losses.mean_squared_error,
-    losses.mean_squared_logarithmic_error,
-    losses.poisson,
-    losses.sparse_categorical_crossentropy,
-    losses.squared_hinge,
-    losses.tversky,
-    ],
-    Callable[[Any, Any], Any]
-    ])
-'''
-loss:
-        Loss function. May be a string (name of loss function), or
-        a `keras.losses.Loss` instance. See `keras.losses`. A
-        loss function is any callable with the signature
-        `loss = fn(y_true, y_pred)`, where `y_true` are the ground truth
-        values, and `y_pred` are the model's predictions.
-        `y_true` should have shape `(batch_size, d0, .. dN)`
-        (except in the case of sparse loss functions such as
-        sparse categorical crossentropy which expects integer arrays of
-        shape `(batch_size, d0, .. dN-1)`).
-        `y_pred` should have shape `(batch_size, d0, .. dN)`.
-        The loss function should return a float tensor.
-'''
-verbose_auto                = Literal["auto"]
-verbose_silent              = Literal[0]
-verbose_progress_bar        = Literal[1]
-verbose_one_line_per_epoch  = Literal[2]
+nparray_or_tensor = Union[np.ndarray, Tensor]
 
 class light_keras_sequential:
     def __init__(
@@ -164,16 +104,22 @@ class light_keras_sequential:
 
     def add(
         self,
-        layer:          Layer,
+        layer:          Union[Layer, Sequence[Layer]],
         rebuild:        bool    = True
         ):
-        self.model.add(layer, rebuild)
+        if isinstance(layer, Layer):
+            self.model.add(layer, rebuild)
+        elif isinstance(layer, Sequence):
+            for item in layer:
+                self.model.add(item, rebuild)
         return self
     def pop(
         self,
-        rebuild:        bool    = True
+        rebuild:        bool    = True,
+        time:           int     = 1
         ):
-        self.model.pop(rebuild)
+        for _ in range(time):
+            self.model.pop(rebuild)
         return self
     def compile(
         self,
@@ -186,26 +132,26 @@ class light_keras_sequential:
             loss=name_or_instance_of_loss,
             **kwargs)
         return self
-    def fit(
+    def fit[_X, _Y](
         self,
-        train_or_trains_of_dataX                    = None,
-        label_or_labels_or_dataY                    = None,
+        train_or_trains_of_dataX:                _X = None,
+        label_or_labels_or_dataY:                _Y = None,
         batch_size:                   Optional[int] = None, #default to 32
         epochs:                                 int = 1,
-        verbose:           Literal["auto", 0, 1, 2] = "auto",
+        verbose:                       verbose_type = "auto",
         callbacks:              List[KerasCallback] = None,
         validation_split:           NumberBetween01 = 0.0,
-        validation_data:                      tuple = None,
-        shuffle:                               bool =True,
-        class_weight=None,
-        sample_weight=None,
-        initial_epoch=0,
-        steps_per_epoch=None,
-        validation_steps=None,
-        validation_batch_size=None,
-        validation_freq=1,
-    ):
-        self.last_result = self.model.fit(
+        validation_data:              Tuple[_X, _Y] = None,
+        shuffle:                               bool = True,
+        class_weight:    Optional[Dict[int, float]] = None,
+        sample_weight:  Optional[nparray_or_tensor] = None,
+        initial_epoch:                          int = 0,
+        steps_per_epoch:              Optional[int] = None,
+        validation_steps:             Optional[int] = None,
+        validation_batch_size:        Optional[int] = None,
+        validation_freq:                        int = 1,
+    ) -> KerasHistory:
+        return self.model.fit(
                                 x = train_or_trains_of_dataX,
                                 y = label_or_labels_or_dataY,
                            epochs = epochs,
@@ -222,22 +168,65 @@ class light_keras_sequential:
                  validation_steps = validation_steps,
             validation_batch_size = validation_batch_size,
                   validation_freq = validation_freq
-            )
-        return self
-    def evaluate(
+                  )
+    def evaluate[_X, _Y](
         self,
-        dataX=None,
-        DataY=None,
-        batch_size=None,
-        verbose="auto",
-        sample_weight=None,
-        steps=None,
-        callbacks=None,
-        return_dict=False,
+        dataX:          _X                          = None,
+        dataY:          _Y                          = None,
+        batch_size:     Optional[int]               = None,
+        verbose:        verbose_type                = "auto",
+        sample_weight:  Optional[nparray_or_tensor] = None,
+        steps:          Optional[int]               = None,
+        callbacks:      List[KerasCallback]         = None,
         **kwargs,
-    ):
-        self.model.evaluate(dataX, DataY, batch_size, verbose, callbacks)
+    ) -> Dict[str, Any]:
+        self.model.evaluate(
+            x = dataX,
+            y = dataY,
+            batch_size = batch_size,
+            verbose = verbose,
+            sample_weight = sample_weight,
+            steps = steps,
+            callbacks = callbacks,
+            return_dict = True,
+            **kwargs
+        )
         return self
+    def predict[_X](
+        self,
+        dataX:          _X                          = None,
+        batch_size:     Optional[int]               = None,
+        verbose:        verbose_type                = "auto",
+        steps:          Optional[int]               = None,
+        callbacks:      List[KerasCallback]         = None,
+        **kwargs,
+    ) -> np.ndarray:
+        return self.model.predict(
+            x = dataX,
+            batch_size = batch_size,
+            verbose = verbose,
+            steps = steps,
+            callbacks = callbacks,
+            **kwargs
+        )
+    def predict_classes[_X](
+        self,
+        dataX:          _X                          = None,
+        batch_size:     Optional[int]               = None,
+        verbose:        verbose_type                = "auto",
+        steps:          Optional[int]               = None,
+        callbacks:      List[KerasCallback]         = None,
+        **kwargs,
+    ) -> np.ndarray:
+        #TODO
+        return np.argmax(self.model.predict(
+            x = dataX,
+            batch_size = batch_size,
+            verbose = verbose,
+            steps = steps,
+            callbacks = callbacks,
+            **kwargs
+        ), axis=1)
 
 if __name__ == "__main__":
     pass

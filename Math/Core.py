@@ -9,26 +9,17 @@ NpSignedIntNumber       = Union[
     np.int16,
     np.int32,
     np.int64,
-    np.int128,
-    np.int256,
-    np.int256,
 ]
 NpUnsignedIntNumber     = Union[
     np.uint8,
     np.uint16,
     np.uint32,
     np.uint64,
-    np.uint128,
-    np.uint256,
 ]
 NpFloatNumber           = Union[
     np.float16,
     np.float32,
     np.float64,
-    np.float128,
-    np.float256,
-    np.float80,
-    np.float96
 ]
 NumberLike              = Union[
     BasicIntFloatNumber,
@@ -42,6 +33,8 @@ NumberInstanceOrContainer = Union[
     Sequence[NumberLike],
     Dict[Any, NumberLike]
 ]
+
+NumberInside = NumberLike
 
 def clamp_without_check(
     value:  NumberLike,
