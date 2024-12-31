@@ -4,7 +4,7 @@ from lekit.File.Core            import (
     UnWrapper                   as     UnWrapper2Str,
     Wrapper                     as     Wrapper2File
 )
-from lekit.Math.Core            import *
+from lekit.MathEx.Core            import *
 from keras.api.models import (
     Sequential                  as     KerasSequentialModel,
     load_model                  as     load_keras_model,
@@ -17,14 +17,14 @@ from lekit.ML.KerasInternal.VerboseType import *
 from lekit.ML.KerasInternal.LossType    import *
 
 from tensorflow                 import Tensor
+from keras.api.utils            import to_categorical
 from keras.api.callbacks        import History as KerasHistory
-from keras.api.optimizers       import Optimizer
-from keras.api                  import losses, metrics
-from keras.api.layers           import Layer
-from keras.api.losses           import Loss
-from keras.api.metrics          import Metric
+from keras.api.optimizers       import Optimizer as KerasOptimizer
+from keras.api.layers           import Layer as KerasLayer
+from keras.api.losses           import Loss as KerasLoss
+from keras.api.metrics          import Metric as KerasMetric
 from keras.api.callbacks        import Callback as KerasCallback
-from keras.api.initializers     import Initializer
+from keras.api.initializers     import Initializer as KerasInitalizer
 
 nparray_or_tensor = Union[np.ndarray, Tensor]
 
@@ -35,7 +35,7 @@ class light_keras_sequential:
         *,
         initmodel:      Optional[KerasSequentialModel] = None,
         initfile:       Optional[Union[str, tool_file]] = None,
-        initlayers:     Optional[Sequence[Layer]]   = None,
+        initlayers:     Optional[Sequence[KerasLayer]] = None,
         initdict_json:  dict                        = None,
         # initconfig = init*...
         trainable:      bool                        = True,
@@ -68,7 +68,7 @@ class light_keras_sequential:
             str,
             tool_file,
             dict,
-            Sequence[Layer]
+            Sequence[KerasLayer]
             ]
         ) -> Self:
         if isinstance(initconfig, KerasSequentialModel):
@@ -99,15 +99,17 @@ class light_keras_sequential:
             self.model.save(UnWrapper2Str(file))
         elif file.in_extensions("weights", "h5"):
             self.model.save_weights(UnWrapper2Str(file))
+        elif file.in_extensions("json"):
+            self.model.to_json(UnWrapper2Str(file))
         else:
             self.model.save(UnWrapper2Str(file))
 
     def add(
         self,
-        layer:          Union[Layer, Sequence[Layer]],
+        layer:          Union[KerasLayer, Sequence[KerasLayer]],
         rebuild:        bool    = True
         ):
-        if isinstance(layer, Layer):
+        if isinstance(layer, KerasLayer):
             self.model.add(layer, rebuild)
         elif isinstance(layer, Sequence):
             for item in layer:
@@ -123,7 +125,7 @@ class light_keras_sequential:
         return self
     def compile(
         self,
-        name_or_instance_of_optimizer:  Union[Optimizer, str]               = "rmsprop",
+        name_or_instance_of_optimizer:  Union[KerasOptimizer, str]          = "rmsprop",
         name_or_instance_of_loss:       Optional[Union[str, losses_type]]   = None,
         **kwargs
         ):
@@ -136,6 +138,9 @@ class light_keras_sequential:
         self,
         train_or_trains_of_dataX:                _X = None,
         label_or_labels_or_dataY:                _Y = None,
+        *,
+        need_classify_label:                   bool = False,
+        label_classifier:Callable[[_Y], np.ndarray] = to_categorical,
         batch_size:                   Optional[int] = None, #default to 32
         epochs:                                 int = 1,
         verbose:                       verbose_type = "auto",
@@ -151,6 +156,8 @@ class light_keras_sequential:
         validation_batch_size:        Optional[int] = None,
         validation_freq:                        int = 1,
     ) -> KerasHistory:
+        if need_classify_label:
+            label_or_labels_or_dataY = label_classifier(label_or_labels_or_dataY)
         return self.model.fit(
                                 x = train_or_trains_of_dataX,
                                 y = label_or_labels_or_dataY,
@@ -218,8 +225,7 @@ class light_keras_sequential:
         callbacks:      List[KerasCallback]         = None,
         **kwargs,
     ) -> np.ndarray:
-        #TODO
-        return np.argmax(self.model.predict(
+        return np.argmax(self.predict(
             x = dataX,
             batch_size = batch_size,
             verbose = verbose,
@@ -227,6 +233,10 @@ class light_keras_sequential:
             callbacks = callbacks,
             **kwargs
         ), axis=1)
+
+    def summary(self, *args, **kwargs):
+        self.model.summary(*args, **kwargs)
+        return self
 
 if __name__ == "__main__":
     pass

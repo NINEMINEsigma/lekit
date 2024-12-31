@@ -30,11 +30,11 @@ const_config_file = "config.json"
 class GlobalConfig:
     def get_config_file(self):
         return self.data_dir|self.__const_config_file
-    
+
     @property
     def config_file(self):
         return self.get_config_file()
-    
+
     def __init__(self, data_dir:Optional[Union[tool_file, str]]=None, is_try_create_data_dir:bool=False):
         # build up data folder
         if data_dir is None:
@@ -65,7 +65,7 @@ class GlobalConfig:
         self.data_dir.save()
     def load_temp_data(self):
         return self.data_dir.load()
-    
+
     def get_file(self, file:str, is_must:bool=False):
         result = self.data_dir|file
         if is_must and result.exists() is False:
@@ -97,7 +97,7 @@ class GlobalConfig:
             return False
         result.create()
         return True
-    
+
     def __setitem__(self, key:str, value:str):
         self.__data_pair[key] = value
     def __getitem__(self, key:str):
@@ -110,7 +110,7 @@ class GlobalConfig:
         return iter(self.__data_pair)
     def __len__(self):
         return len(self.__data_pair)
-    
+
     def save_properties(self):
         config = self.config_file
         config.open('w', encoding='utf-8')
@@ -130,11 +130,11 @@ class GlobalConfig:
                     self.__data_pair[property_name] = config.data["properties"][property_name]
             else:
                 raise ValueError("Can't find properties in config file")
-        return self    
-                
+        return self
+
     def print_source_pair(self):
         print(self.__data_pair)
-                
+
     def Log(self, message_type:str, message):
         print(f"{message_type}: {UnWrapper2Str(message)}")
         return self
@@ -150,22 +150,25 @@ class GlobalConfig:
     def LogPropertyNotFound(self, message):
         self.Log("Property not found", message)
         return self
-                
+
     def FindItem(self, key:str):
         if key in self.__data_pair:
             return self.__data_pair[key]
         else:
             self.LogPropertyNotFound(key)
             return None
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
+
+if __name__ == "__main__":
+    plt.subplot(252)
+    plt.subplot(257)
+    plt.subplot(2,5,10)
+    plt.show()
+
+
+
+
+
+
+
+
+

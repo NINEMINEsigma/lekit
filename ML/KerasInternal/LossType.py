@@ -1,9 +1,7 @@
 from typing import *
 from keras.api                  import losses
 
-type losses_type = Union[
-    losses.Loss,
-    Union[
+type losses_class_type = Union[
     losses.CTC,
     losses.BinaryCrossentropy,
     losses.BinaryFocalCrossentropy,
@@ -25,6 +23,8 @@ type losses_type = Union[
     losses.SparseCategoricalCrossentropy,
     losses.SquaredHinge,
     losses.Tversky,
+]
+type losses_func_type = Union[
     losses.binary_crossentropy,
     losses.binary_focal_crossentropy,
     losses.categorical_crossentropy,
@@ -46,7 +46,11 @@ type losses_type = Union[
     losses.sparse_categorical_crossentropy,
     losses.squared_hinge,
     losses.tversky,
-    ],
+]
+losses_type = Union[
+    losses.Loss,
+    losses_class_type,
+    losses_func_type,
     Callable[[Any, Any], Any]
     ]
 '''

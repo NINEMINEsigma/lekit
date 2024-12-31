@@ -27,3 +27,12 @@ except ImportError as ex:
     ImportingThrow(ex, "Requests", ["requests", "urllib3"])
 from lekit.Web.Requests import *
 
+# Import Selunit.py
+try:
+    from lekit.MathEx.Transform import Rect as _
+except ImportError:
+    InternalImportingThrow("Selunit", ["Transform"])
+try:
+    import selenium as _
+except ImportError as ex:
+    ImportingThrow(ex, "Selunit", ["selenium"])

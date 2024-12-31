@@ -1,6 +1,11 @@
 from lekit.Internal import *
 
 try:
+    from lekit import MathEx as _
+except ImportError:
+    InternalImportingThrow("Machine-Learning", "Math")
+
+try:
     import sklearn as _
 except ImportError as ex:
     ImportingThrow(ex, "Core", ["scikit-learn"])

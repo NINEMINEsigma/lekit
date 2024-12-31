@@ -12,7 +12,7 @@ from lekit.File.Core    import tool_file, Wrapper as Wrapper2File
 VideoWriter = base.VideoWriter
 def mp4_with_MPEG4_fourcc() -> int:
     return VideoWriter.fourcc(*"mp4v")
-def avi_with_Xvid_fourcc() -> int: 
+def avi_with_Xvid_fourcc() -> int:
     return VideoWriter.fourcc(*"XVID")
 def avi_with_DivX_fourcc() -> int:
     return VideoWriter.fourcc(*"DIVX")
@@ -32,10 +32,10 @@ def flv_with_FLV1_fourcc() -> int:
     return VideoWriter.fourcc(*"FLV1")
 class VideoWriterInstance(VideoWriter):
     def __init__(
-        self, 
-        file_name:  Union[tool_file, str], 
+        self,
+        file_name:  Union[tool_file, str],
         fourcc:     int,
-        fps:        float, 
+        fps:        float,
         frame_size: tuple[int, int],
         is_color:   bool = True
         ):
@@ -58,13 +58,13 @@ class light_cv_view:
         self.retarget(filename_or_index)
     def __del__(self):
         self.release()
-    
+
     def __bool__(self):
         return self.stats
-    
+
     def is_open(self):
         return self.__capture.isOpened()
-        
+
     def release(self):
         if self.__capture is not None:
             self.__capture.release()
@@ -75,14 +75,14 @@ class light_cv_view:
         else:
             self.__capture = base.VideoCapture(Unwrapper2Str(filename_or_index))
         return self
-    
+
     def next_frame(self) -> MatLike:
         self.stats, frame =self.__capture.read()
         if self.stats:
             return frame
         else:
             return None
-    
+
     def get_captrue_info(self, id:int):
         return self.__capture.get(id)
     def get_prop_pos_msec(self):
@@ -119,7 +119,7 @@ class light_cv_view:
         return self.get_captrue_info(15)
     def get_prop_convert_rgb(self):
         return self.get_captrue_info(16)
-        
+
     def setup_capture(self, id:int, value):
         self.__capture.set(id, value)
         return self
@@ -159,28 +159,28 @@ class light_cv_view:
         return self.setup_capture(16, value)
     def set_prop_rectification(self, value:int):
         return self.setup_capture(17, value)
-    
+
     @property
     def frame_size(self) -> Tuple[float, float]:
         return self.get_prop_frame_width(), self.get_prop_frame_height()
-    
+
 class light_cv_camera(light_cv_view):
     def __init__(self, index:int = 0):
         self.writer:    VideoWriter = None
         super().__init__(int(index))
-    
+
     @override
     def release(self):
         super().release()
         if self.writer is not None:
             self.writer.release()
-    
+
     def current_frame(self):
         return self.next_frame()
-    
+
     def recording(
-        self, 
-        stop_pr:    Callable[[], bool], 
+        self,
+        stop_pr:    Callable[[], bool],
         writer:     VideoWriter,
         ):
         self.writer = writer
@@ -200,9 +200,9 @@ class ImageObject:
             str,
             Self,
             light_cv_camera,
-            tool_file, 
-            MatLike, 
-            np.ndarray, 
+            tool_file,
+            MatLike,
+            np.ndarray,
             ImageFile.ImageFile,
             Image.Image
             ]],
@@ -234,9 +234,9 @@ class ImageObject:
     def image(self, image:          Optional[Union[
             str,
             Self,
-            tool_file, 
-            MatLike, 
-            np.ndarray, 
+            tool_file,
+            MatLike,
+            np.ndarray,
             ImageFile.ImageFile,
             Image.Image
             ]]):
@@ -274,7 +274,7 @@ class ImageObject:
     @property
     def dimension(self) -> int:
         return self.image.ndim
-    
+
     @property
     def shape(self) -> Tuple[int, int, int]:
         '''height, width, depth'''
@@ -296,13 +296,13 @@ class ImageObject:
         return self.image
 
     def load_image(
-        self, 
+        self,
         image:          Optional[Union[
             str,
-            tool_file, 
+            tool_file,
             Self,
-            MatLike, 
-            np.ndarray, 
+            MatLike,
+            np.ndarray,
             ImageFile.ImageFile,
             Image.Image
             ]],
@@ -334,8 +334,8 @@ class ImageObject:
         return self
 
     def show_image(
-        self, 
-        window_name:        str                         = "Image", 
+        self,
+        window_name:        str                         = "Image",
         delay:              Union[int,str]              = 0,
         image_show_func:    Callable[[Self], None]      = None,
         *args, **kwargs
@@ -427,7 +427,7 @@ class ImageObject:
         if new_image is not None:
             self.image = new_image
         return self
-    
+
     # 图片翻折
     def flip(self, flip_code:int):
         """翻转图片"""
@@ -482,7 +482,7 @@ class ImageObject:
         if self.is_invalid():
             return None
         self.image = self.get_convert(color_convert)
-    
+
     def is_grayscale(self):
         return self.dimension == 2
     def get_grayscale(self):
@@ -495,7 +495,7 @@ class ImageObject:
         return self
 
     def get_convert_flag(
-        self, 
+        self,
         targetColorTypeName:Literal[
             "BGR", "RGB", "GRAY", "YCrCb"
             ]
@@ -504,7 +504,7 @@ class ImageObject:
         flag = self.guess_color_space()
         if flag is None:
             return None
-        
+
         if targetColorTypeName == "BGR":
             if flag == "RGB":
                 return base.COLOR_RGB2BGR
@@ -544,7 +544,7 @@ class ImageObject:
             self.image = result
         return result
     def calcHist(
-        self, 
+        self,
         channel:    Union[List[int], int],
         mask:       Optional[MatLike]       = None,
         hist_size:  Sequence[int]           = [256],
@@ -556,8 +556,8 @@ class ImageObject:
         return base.calcHist(
             [self.image],
             channel if isinstance(channel, list) else [channel],
-            mask, 
-            hist_size, 
+            mask,
+            hist_size,
             ranges)
 
     # 子集操作
@@ -606,10 +606,10 @@ class ImageObject:
         images = [ image for image in args]
         images.append(self)
         return ImageObject(np.hstack([np.uint8(image.image) for image in images]))
-    
+
     def merge_with_blending(self, other:Self, weights:Tuple[float, float]):
         return ImageObject(base.addWeighted(self.image, weights[0], other.image, weights[1], 0))
-    
+
     def add(self, image_or_value:Union[Self, int]):
         if isinstance(image_or_value, int):
             self.image = base.add(self.image, image_or_value)
@@ -665,7 +665,7 @@ class ImageObject:
         return self
     def __neg__(self):
         return ImageObject(self.image.copy()).bitwise_not()
-    
+
 class NoiseImageObject(ImageObject):
     def __init__(
         self,
@@ -679,7 +679,7 @@ class NoiseImageObject(ImageObject):
         super().__init__(NoiseImageObject.get_new_noise(
             None, height, weight, mean=mean, sigma=sigma, dtype=dtype
             ))
-    
+
     @classmethod
     def get_new_noise(
         raw_image:  Optional[MatLike],
@@ -699,9 +699,9 @@ class NoiseImageObject(ImageObject):
 def Unwrapper(image:Optional[Union[
             str,
             ImageObject,
-            tool_file, 
-            MatLike, 
-            np.ndarray, 
+            tool_file,
+            MatLike,
+            np.ndarray,
             ImageFile.ImageFile,
             Image.Image
             ]]) -> MatLike:
@@ -710,9 +710,9 @@ def Unwrapper(image:Optional[Union[
 def Wrapper(image:Optional[Union[
             str,
             ImageObject,
-            tool_file, 
-            MatLike, 
-            np.ndarray, 
+            tool_file,
+            MatLike,
+            np.ndarray,
             ImageFile.ImageFile,
             Image.Image
             ]]) -> ImageObject:
@@ -736,21 +736,21 @@ class light_cv_window:
         if self.__my_window_name is not None and base.getWindowProperty(self.__my_window_name, base.WND_PROP_VISIBLE) > 0:
             base.destroyWindow(self.__my_window_name)
         return self
-    
+
     @property
     def window_rect(self):
         return base.getWindowImageRect(self.__my_window_name)
     @window_rect.setter
     def window_rect(self, rect:Tuple[float, float, float, float]):
         self.set_window_rect(rect[0], rect[1], rect[2], rect[3])
-    
+
     def set_window_size(self, weight:int, height:int):
         base.resizeWindow(self.__my_window_name, weight, height)
         return self
     def get_window_size(self) -> Tuple[float, float]:
         rect = self.window_rect
         return rect[2], rect[3]
-    
+
     def get_window_property(self, prop_id:int):
         return base.getWindowProperty(self.__my_window_name, prop_id)
     def set_window_property(self, prop_id:int, prop_value:int):
@@ -784,7 +784,7 @@ class light_cv_window:
     def set_not_autosize(self):
         base.setWindowProperty(self.__my_window_name, base.WINDOW_AUTOSIZE, 0)
         return self
-    
+
     def set_window_rect(self, x:int, y:int, weight:int, height:int):
         base.moveWindow(self.__my_window_name, x, y)
         return self.set_window_size(weight, height)
@@ -803,7 +803,7 @@ def get_haarcascade_frontalface(name_or_default:Optional[str]=None):
 
 def detect_human_face(
     image:          ImageObject,
-    detecter:       base.CascadeClassifier, 
+    detecter:       base.CascadeClassifier,
     scaleFactor:    float                   = 1.1,
     minNeighbors:   int                     = 4,
     *args, **kwargs):
@@ -818,10 +818,10 @@ class internal_detect_faces_oop(Callable[[ImageObject], None]):
         faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
         for (x,y,w,h) in faces:
             image.operator_cv(base.rectangle,(x,y),(x+w,y+h),(255,0,0),2)
-    
+
 def easy_detect_faces(camera:light_cv_camera):
     ImageObject(camera).show_image("window", 'q', internal_detect_faces_oop())
-    
+
 # 示例使用
 if __name__ == "__main__":
     img_obj = ImageObject("path/to/your/image.jpg")
@@ -836,12 +836,12 @@ if __name__ == "__main__":
 class tool_file_cvex(tool_file):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
     @override
     def load_as_image(self) -> ImageObject:
         self.data = ImageObject(self.get_path())
         return self.data
-    
+
     @override
     def save(self, path = None):
         image:ImageObject   = self.data
