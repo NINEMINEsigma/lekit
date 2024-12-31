@@ -1,4 +1,5 @@
 from typing             import *
+from lekit.Internal     import *
 
 import cv2              as     base
 import cv2.data         as     BaseData
@@ -30,7 +31,7 @@ def oggTheora_with_THEO_fourcc() -> int:
     return VideoWriter.fourcc(*"THEO")
 def flv_with_FLV1_fourcc() -> int:
     return VideoWriter.fourcc(*"FLV1")
-class VideoWriterInstance(VideoWriter):
+class VideoWriterInstance(VideoWriter, any_class):
     def __init__(
         self,
         file_name:  Union[tool_file, str],
@@ -51,13 +52,17 @@ def until_esc():
 def is_current_key(key:str, *, wait_delay:int = 1):
     return wait_key(wait_delay) & 0xFF == ord(key[0])
 
-class light_cv_view:
+class light_cv_view(any_class):
     def __init__(self, filename_or_index:Union[str, tool_file, int]):
         self.__capture: base.VideoCapture   = None
         self.stats:     bool                = True
         self.retarget(filename_or_index)
     def __del__(self):
         self.release()
+
+    @override
+    def ToString(self):
+        return f"View<{self.width}x{self.height}>"
 
     def __bool__(self):
         return self.stats
@@ -161,10 +166,33 @@ class light_cv_view:
         return self.setup_capture(17, value)
 
     @property
+    def width(self) -> float:
+        return self.get_prop_frame_width()
+    @width.setter
+    def width(self, value:float) -> float:
+        self.set_prop_frame_width(value)
+        return value
+    @property
+    def height(self):
+        return self.get_prop_frame_height()
+    @height.setter
+    def height(self, value:float) -> float:
+        self.set_prop_frame_height(value)
+        return value
+
+    @property
     def frame_size(self) -> Tuple[float, float]:
         return self.get_prop_frame_width(), self.get_prop_frame_height()
+    @property
+    def shape(self):
+        return self.frame_size
+    @frame_size.setter
+    def frame_size(self, value:Tuple[float, float]) -> Tuple[float, float]:
+        self.set_prop_frame_width(value[0])
+        self.set_prop_frame_height(value[1])
+        return value
 
-class light_cv_camera(light_cv_view):
+class light_cv_camera(light_cv_view, any_class):
     def __init__(self, index:int = 0):
         self.writer:    VideoWriter = None
         super().__init__(int(index))
@@ -193,7 +221,11 @@ class light_cv_camera(light_cv_view):
         base.destroyWindow("__recording__")
         return self
 
-class ImageObject:
+    @override
+    def ToString(self):
+        return f"Camera<{self.width}x{self.height}>"
+
+class ImageObject(any_class):
     def __init__(
         self,
         image:          Optional[Union[
@@ -214,6 +246,17 @@ class ImageObject:
             self.lock_from_camera(image)
         else:
             self.load_image(image, flags)
+
+    @override
+    def SymbolName(self):
+        return "Image"
+    @override
+    def ToString(self):
+        current = self.image
+        if current is None:
+            return "null"
+        return f"Image<{current.shape[1]}x{current.shape[0]}:\n"+str(
+            self.image)+"\n>"
 
     @property
     def camera(self) -> light_cv_camera:
@@ -679,6 +722,10 @@ class NoiseImageObject(ImageObject):
         super().__init__(NoiseImageObject.get_new_noise(
             None, height, weight, mean=mean, sigma=sigma, dtype=dtype
             ))
+
+    @override
+    def SymbolName(self):
+        return "Noise"
 
     @classmethod
     def get_new_noise(

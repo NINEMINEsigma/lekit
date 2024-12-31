@@ -1,10 +1,15 @@
-from typing     import *
-from abc        import *
-import math     as     base
-import                 json
-from lekit.MathEx.Core import NumberLike
+from typing             import *
+from lekit.Internal     import *
+from abc                import *
+import math             as     base
+from lekit.MathEx.Core  import *
 
-class abs_box(ABC):
+# region Boxing with no angle
+
+class abs_box(any_class, ABC):
+    @override
+    def ToString(self):
+        return str(self)
     @abstractmethod
     def __str__(self) -> str:
         raise NotImplementedError()
@@ -120,14 +125,44 @@ BoxBasicLike = Union[
     List[NumberLike],
     str,#json {x:..., }
     Dict[str, NumberLike],#json {x:..., }
+    np.ndarray
 ]
 
 class Box(abs_box):
     def __init__(self, left: NumberLike, right: NumberLike, top: NumberLike, bottom: NumberLike):
-        self.left = left
-        self.right = right
-        self.top = top
-        self.bottom = bottom
+        self.__inject_array = np.ndarray([left, right, top, bottom])
+
+    @property
+    def left(self) -> NumberLike:
+        return self.__inject_array[0]
+    @left.setter
+    def left(self, value: NumberLike):
+        self.__inject_array[0] = value
+    @property
+    def right(self) -> NumberLike:
+        return self.__inject_array[1]
+    @right.setter
+    def right(self, value: NumberLike):
+        self.__inject_array[1] = value
+    @property
+    def top(self) -> NumberLike:
+        return self.__inject_array[2]
+    @top.setter
+    def top(self, value: NumberLike):
+        self.__inject_array[2] = value
+    @property
+    def bottom(self) -> NumberLike:
+        return self.__inject_array[3]
+    @bottom.setter
+    def bottom(self, value: NumberLike):
+        self.__inject_array[3] = value
+
+    @property
+    def data_array(self):
+        return self.__inject_array
+    @data_array.setter
+    def data_array(self, value: np.ndarray):
+        self.__inject_array = value
 
     @override
     def __str__(self):
@@ -233,15 +268,44 @@ RectBasicLike = Union[
     Tuple[NumberLike, NumberLike, NumberLike, NumberLike],
     Sequence[NumberLike],
     str,#json {x:..., }
-    Dict[str, NumberLike],#json {x..., }
+    Dict[str, NumberLike],#json {x..., },
+    np.ndarray
 ]
 
 class Rect:
     def __init__(self, x: float, y: float, w: float, h: float):
-        self.x = x
-        self.y = y
-        self.w = w
-        self.h = h
+        self.__inject_array = np.ndarray([x, y, w, h])
+
+    @property
+    def x(self):
+        return self.__inject_array[0]
+    @x.setter
+    def x(self, value):
+        self.__inject_array[0] = value
+    @property
+    def y(self):
+        return self.__inject_array[1]
+    @y.setter
+    def y(self, value):
+        self.__inject_array[1] = value
+    @property
+    def w(self):
+        return self.__inject_array[2]
+    @w.setter
+    def w(self, value):
+        self.__inject_array[2] = value
+    @property
+    def h(self):
+        return self.__inject_array[3]
+    @h.setter
+    def h(self, value):
+        self.__inject_array[3] = value
+    @property
+    def data_array(self):
+        return self.__inject_array
+    @data_array.setter
+    def data_array(self, value):
+        self.__inject_array = value
 
     @override
     def __str__(self):
@@ -332,7 +396,7 @@ def Wrapper2Box(
     datahead:   Union[
         NumberLike,
         BoxLike,
-        Rect
+        RectLike
         ],
     right:  Optional[NumberLike] = None,
     top:    Optional[NumberLike] = None,
@@ -341,18 +405,25 @@ def Wrapper2Box(
     if right is not None:
         return Box(datahead, right, top, bottom)
 
-    if isinstance(datahead, Box):
-        return datahead
-    if isinstance(datahead, Rect):
-        return datahead.to_box()
-    elif isinstance(datahead, BoxBasicLike):
-        return Box(*datahead)
+    if isinstance(datahead, np.ndarray):
+        return Box(datahead[0], datahead[1], datahead[2], datahead[3])
+    if isinstance(datahead, BoxLike):
+        if isinstance(datahead, Box):
+            return datahead
+        else:
+            return Box(*datahead)
+    if isinstance(datahead, RectLike):
+        if isinstance(datahead, Rect):
+            return datahead.to_box()
+        else:
+            return Rect(*datahead).to_box()
     return Box(datahead, right, top, bottom)
 
 def Wrapper2Rect(
     datahead:  Union[
         NumberLike,
-        RectLike,
+        BoxLike,
+        RectLike
         ],
     y:  Optional[NumberLike] = None,
     w:  Optional[NumberLike] = None,
@@ -362,13 +433,102 @@ def Wrapper2Rect(
     if y is not None:
         return Rect(datahead, y, w, h)
 
-    if isinstance(datahead, Rect):
-        return datahead
-    if isinstance(datahead, RectBasicLike):
-        return Rect(*datahead)
+    if isinstance(datahead, np.ndarray):
+        return Rect(datahead[0], datahead[1], datahead[2], datahead[3])
+    if isinstance(datahead, RectLike):
+        if isinstance(datahead, Rect):
+            return datahead
+        else:
+            return Rect(*datahead)
+    if isinstance(datahead, BoxLike):
+        if isinstance(datahead, Box):
+            return Rect(datahead.left, datahead.bottom, datahead.right-datahead.left, datahead.top-datahead.bottom)
+        else:
+            temp = Box(*datahead)
+            return Rect(temp.left, temp.bottom, temp.right-temp.left, temp.top-temp.bottom)
     return Rect(datahead, y, w, h)
 
+# region end
 
+# region quaternion
+
+class Quaternion:
+    def __init__(self, r:NumberLike, i:NumberLike, j:NumberLike, k:NumberLike):
+        self.__inject_array = np.array([r, i, j, k])
+
+    @property
+    def r(self):
+        return self.__inject_array[0]
+    @r.setter
+    def r(self, value:NumberLike):
+        self.__inject_array[0] = value
+    @property
+    def i(self):
+        return self.__inject_array[1]
+    @i.setter
+    def i(self, value:NumberLike):
+        self.__inject_array[1] = value
+    @property
+    def j(self):
+        return self.__inject_array[2]
+    @j.setter
+    def j(self, value:NumberLike):
+        self.__inject_array[2] = value
+    @property
+    def k(self):
+        return self.__inject_array[3]
+    @k.setter
+    def k(self, value:NumberLike):
+        self.__inject_array[3] = value
+    @property
+    def data_array(self):
+        return self.__inject_array
+    @data_array.setter
+    def data_array(self, value:Sequence):
+        self.__inject_array = np.array(value, dtype=float)
+
+    def __repr__(self):
+        return f"Quaternion({self.__inject_array[0]}, {self.__inject_array[1]}i, {self.__inject_array[2]}j, {self.__inject_array[3]}k)"
+
+    def __add__(self, other):
+        return Quaternion(*(self.__inject_array + other.data))
+
+    def __sub__(self, other):
+        return Quaternion(*(self.__inject_array - other.data))
+
+    def __mul__(self, other):
+        a1, b1, c1, d1 = self.__inject_array
+        a2, b2, c2, d2 = other.data
+        return Quaternion(
+            a1*a2 - b1*b2 - c1*c2 - d1*d2,
+            a1*b2 + b1*a2 + c1*d2 - d1*c2,
+            a1*c2 - b1*d2 + c1*a2 + d1*b2,
+            a1*d2 + b1*c2 - c1*b2 + d1*a2
+        )
+
+    def conjugate(self):
+        return Quaternion(self.__inject_array[0], -self.__inject_array[1], -self.__inject_array[2], -self.__inject_array[3])
+
+    def norm(self):
+        return np.linalg.norm(self.__inject_array)
+
+    def inverse(self):
+        return self.conjugate() * (1.0 / self.norm()**2)
+
+if __name__ == "__main__":
+    # 示例使用
+    q1 = Quaternion(1, 2, 3, 4)
+    q2 = Quaternion(5, 6, 7, 8)
+
+    print("q1:", q1)
+    print("q2:", q2)
+
+    print("q1 + q2:", q1 + q2)
+    print("q1 - q2:", q1 - q2)
+    print("q1 * q2:", q1 * q2)
+    print("Conjugate of q1:", q1.conjugate())
+    print("Norm of q1:", q1.norm())
+    print("Inverse of q1:", q1.inverse())
 
 
 

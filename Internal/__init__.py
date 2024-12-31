@@ -43,45 +43,50 @@ class type_class(ABC):
     def SymbolName(self) -> str:
         return self.GetType().__name__
     def ToString(self) -> str:
-        return self.GetType().__name__
-class left_value_reference[_T](type_class):
+        return str(self.GetType())
+class base_value_reference[_T](type_class):
     def __init__(self, ref_value:_T):
-        self.__ref_value = ref_value
-    @property
-    def ref_value(self):
-        return self.__ref_value
-    @ref_value.setter
-    def ref_value(self, value):
-        if value is None or isinstance(value, _T):
-            self.__ref_value = value
-        else:
-            raise TypeError(f"Cannot assign {type(value)} to {_T}")
+        self._ref_value = ref_value
+        self.__real_type = type(ref_value)
     def _clear_ref_value(self):
-        self.__ref_value = None
+        self._ref_value = None
     @override
     def GetType(self):
-        return _T
+        return self.__real_type
     @override
     def SymbolName(self) -> str:
-        if self.__ref_value is None:
+        if self._ref_value is None:
             return "null"
         return f"{self.GetType().__name__}&"
-class right_value_refenence[_T](type_class):
-    def __init__(self, ref_value):
-        self.__ref_value = ref_value
+    @override
+    def ToString(self) -> str:
+        if self._ref_value is None:
+            return "null"
+        return str(self._ref_value)
+class left_value_reference[_T](base_value_reference):
+    def __init__(self, ref_value:_T):
+        super().__init__(ref_value)
     @property
-    def ref_value(self):
+    def ref_value(self) -> _T:
+        return self._ref_value
+    @ref_value.setter
+    def ref_value(self, value) -> _T:
+        if value is None or isinstance(value, self.GetType()):
+            self._ref_value = value
+        else:
+            raise TypeError(f"Cannot assign {type(value)} to {self.GetType()}")
+        return value
+class right_value_refenence[_T](type_class):
+    def __init__(self, ref_value:_T):
+        super().__init__(ref_value)
+    @property
+    def ref_value(self) -> _T:
         result = self.__ref_value
         self.__ref_value = None
         return result
-    @override
-    def GetType(self):
-        return _T
-    @override
-    def SymbolName(self) -> str:
-        if self.__ref_value is None:
-            return "null"
-        return f"{self.GetType().__name__}&&"
+    @property
+    def const_ref_value(self) -> _T:
+        return self.__ref_value
 class any_class(type_class, ABC):
     def AsRef[_T](self):
         return dynamic_cast[_T](self)
@@ -114,8 +119,14 @@ class any_class(type_class, ABC):
         return action(self.AsRef[_T]())
 
 
+
 if __name__ == "__main__":
-    print(type(None))
+    ref = left_value_reference[int](5.5)
+    print(ref.ToString())
+    print(ref.GetType())
+    print(ref.SymbolName())
+    print(ref.ref_value)
+    print(ref)
 
 
 

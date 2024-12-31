@@ -2,6 +2,7 @@ import importlib
 import inspect
 import types
 from typing import *
+from lekit.Internal import *
 
 type_symbols = {
     'int' : int,
@@ -15,12 +16,19 @@ type_symbols = {
     'NoneType' : type(None),
     }
 
-class light_reflection:
+class light_reflection(any_class):
     def __init__(self, obj:object, type_str:str=None, *args, **kwargs):
         if obj is not None:
             self.obj = obj
         elif type_str is not None:
             self.obj = self.create_instance(type_str, args, kwargs)
+
+    @override
+    def SymbolName(self):
+        return "light_reflection"
+    @override
+    def ToString(self):
+        return f"ToolReflection<{type(self.obj).__name__}>"
 
     def get_attributes(self):
         """获取对象的所有属性和它们的值"""
@@ -62,12 +70,12 @@ class light_reflection:
             raise AttributeError(f"{self.obj.__class__.__name__} object has no attribute '{attr_name}'")
     def get(self, field:str):
         return self.get_attribute(field)
-    
+
     def get_type_from_string(self, type_string:str):
         """根据字符串生成类型"""
         if type_string in type_symbols:
             return type_symbols[type_string]
-        
+
         # 首先尝试从内置类型中获取
         if type_string in dir(types):
             return getattr(types, type_string)
@@ -90,7 +98,7 @@ class light_reflection:
             except (ImportError, AttributeError, ValueError) as e:
                 raise TypeError(f"Cannot find type '{type_string}', type_string is {type_string}") from e
 
-            
+
     def create_instance(self, type_string:str, *args, **kwargs):
         """根据类型字符串生成类型的实例"""
         type_ = self.get_type_from_string(type_string)
@@ -98,7 +106,7 @@ class light_reflection:
 
     def create_instance_ex(self, type_string:str, params: Union[Dict[str,object], object]={}):
         """根据类型字符串生成类型的实例"""
-        
+
         typen = self.get_type_from_string(type_string)
         if type_string in type_symbols:
             return typen(params)
@@ -120,7 +128,7 @@ class light_reflection:
             elif param.default is not param.empty:
                 init_args[param_name] = param.default
             elif param_name == 'args' or param_name == 'kwargs':
-                continue    
+                continue
             else:
                 raise TypeError(f"Cannot instantiate type '{type_string}' without required parameter '{param_name}'")
 

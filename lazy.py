@@ -159,11 +159,7 @@ class GlobalConfig:
             return None
 
 if __name__ == "__main__":
-    plt.subplot(252)
-    plt.subplot(257)
-    plt.subplot(2,5,10)
-    plt.show()
-
+    pass
 
 
 

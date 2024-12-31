@@ -1,19 +1,20 @@
-import json
-import shutil
-import pandas as pd
-import os
-import sys
-import pickle
+import                         json
+import                         shutil
+import pandas           as     pd
+import                         os
+import                         sys
+import                         pickle
 
-from lekit.Str.Core                     import UnWrapper, list_byte_to_string
-from lekit.Lang                         import BaseClass
+from lekit.Internal     import *
+from lekit.Str.Core     import UnWrapper, list_byte_to_string
+from lekit.Lang         import BaseClass
 
-from typing                                         import *
-from pathlib                                        import Path
-from pydub                                          import AudioSegment
-from PIL                                            import Image, ImageFile
-from docx                                           import Document
-from docx.document                                  import Document as DocumentObject
+from typing             import *
+from pathlib            import Path
+from pydub              import AudioSegment
+from PIL                import Image, ImageFile
+from docx               import Document
+from docx.document      import Document as DocumentObject
 
 audio_file_type = ["mp3","ogg","wav"]
 image_file_type = ['png', 'jpg', 'jpeg', 'bmp', 'svg', 'ico']
@@ -43,7 +44,7 @@ def is_image_file(file_path:str):
 dir_name_type = str
 file_name_type = str
 
-class tool_file:
+class tool_file(any_class):
 
     __datas_lit_key:    Literal["model"] = "model"
 
@@ -157,7 +158,11 @@ class tool_file:
 
     def load(self):
         if self.__file_path is None:
-            raise FileNotFoundError("file path is none")
+            if os.path.exists(temp_tool_file_path_name):
+                self.data = pickle.load(open(temp_tool_file_path_name, 'rb'))
+                return self.data
+            else:
+                raise FileNotFoundError(f"{self.__file_path} not found, but this ToolFile's target is None")
         elif self.is_dir():
             self.__file = open(os.path.join(self.get_path(), temp_tool_file_path_name), 'rb')
             self.data = pickle.load(self.__file)
@@ -182,7 +187,7 @@ class tool_file:
         elif is_image_file(self.__file_path):
             self.load_as_image()
         else:
-            self.load_as_text()
+            self.load_as_unknown(suffix)
         return self.data
     def load_as_json(self) -> pd.DataFrame:
         self.open('r')
@@ -224,6 +229,8 @@ class tool_file:
     def load_as_docx(self) -> DocumentObject:
         self.data = Document(self.__file_path)
         return self.data
+    def load_as_unknown(self, suffix:str) -> Any:
+        return self.load_as_text()
 
     def save(self, path:str=None):
         if path is None and self.__file_path is None:
@@ -252,7 +259,7 @@ class tool_file:
         elif is_image_file(self.__file_path):
             self.save_as_image(path)
         else:
-            self.save_as_text(path)
+            self.save_as_unknown(path)
         return self
     def save_as_json(self, path:str):
         path = path if path else self.__file_path
@@ -301,6 +308,8 @@ class tool_file:
             table.cell(0, 0).text = self.data
         self.data.save(path if path else self.__file_path)
         return self
+    def save_as_unknown(self, path:str):
+        self.save_as_text(path)
 
     def get_size(self) -> int:
         if self.is_dir():
@@ -478,6 +487,13 @@ class tool_file:
 
     def in_extensions(self, *args:str) -> bool:
         return self.get_extension() in args
+
+    @override
+    def SymbolName(self):
+        return f"ToolFile<{self.get_path()}>"
+    @override
+    def ToString(self):
+        return self.get_path()
 
 def Wrapper(file) -> tool_file:
     if isinstance(file, tool_file):
