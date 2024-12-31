@@ -1,5 +1,6 @@
 from types import NoneType
 from typing import *
+from lekit.Internal import *
 
 # string
 
@@ -60,6 +61,6 @@ class ld_instance:
         return key in self.target
     def __str__(self):
         return str(self.target)
-    
+
     def get_ref(self):
         return self.target

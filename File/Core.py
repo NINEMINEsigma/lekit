@@ -40,6 +40,9 @@ def get_base_filename(file:str):
 def is_image_file(file_path:str):
     return get_extension_name(file_path) in image_file_type
 
+dir_name_type = str
+file_name_type = str
+
 class tool_file:
 
     __datas_lit_key:    Literal["model"] = "model"
@@ -303,8 +306,12 @@ class tool_file:
         if self.is_dir():
             return -1
         return os.path.getsize(self.__file_path)
-    def get_data_type(self):
+    def get_data_type(self) -> type:
         return type(self.data)
+    def has_data_type_is(self, types:Union[type, Sequence[type]]) -> bool:
+        if isinstance(types, Sequence) is False:
+            return self.get_data_type() == types
+        return self.get_data_type() in types
     def get_extension(self, path:str=None):
         if self.is_dir() and path is None:
             raise Exception("Cannot get extension of a directory")
@@ -398,11 +405,19 @@ class tool_file:
             if pr(file.get_filename()):
                 result.append(file)
         return result
+    def dir_walk(
+        self,
+        top,
+        topdown:        bool               = True,
+        onerror:        Optional[Callable] = None,
+        followlinks:    bool               = False
+        ) -> Iterator[tuple[dir_name_type, list[dir_name_type], list[file_name_type]]]:
+        return os.walk(self.__file_path)
 
     def append_text(self, line:str):
-        if self.data is str:
-            self.data = self.data + line
-        elif self.data is DocumentObject:
+        if self.has_data_type_is(type(str)):
+            self.data += line
+        elif self.has_data_type_is(type(DocumentObject)):
             self.data.add_paragraph(line)
         else:
             raise TypeError(f"Unsupported data type for {sys._getframe().f_code.co_name}")
