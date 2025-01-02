@@ -1,5 +1,5 @@
 from typing             import *
-from lekit.File.Core    import tool_file
+from lekit.File.Core    import tool_file, tool_file_or_str, Wrapper as Wrapper2File
 from lekit.Str.Core     import UnWrapper as UnWrapper2Str
 
 import os
@@ -27,6 +27,13 @@ except ImportError:
 
 const_config_file = "config.json"
 
+def generate_empty_config_json(path:tool_file_or_str):
+    file = Wrapper2File(path)
+    file.open('w')
+    file.data = {"properties":{}}
+    file.save()
+    return file
+
 class GlobalConfig:
     def get_config_file(self):
         return self.data_dir|self.__const_config_file
@@ -53,7 +60,7 @@ class GlobalConfig:
         self.__const_config_file = const_config_file
         config_file = self.config_file
         if config_file.exists() is False:
-            config_file.create()
+            generate_empty_config_json(config_file)
         else:
             self.load_properties()
     def __del__(self):
@@ -149,6 +156,9 @@ class GlobalConfig:
         return self
     def LogPropertyNotFound(self, message):
         self.Log("Property not found", message)
+        return self
+    def LogMessageOfPleaseCompleteConfiguration(self):
+        self.LogError("Please complete configuration")
         return self
 
     def FindItem(self, key:str):

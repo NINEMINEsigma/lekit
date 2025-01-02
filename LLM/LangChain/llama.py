@@ -18,7 +18,7 @@ from lekit.LLM.LangChain.AbsInterface   import *
 def do_make_content(**kwargs) -> MessageObject:
     if len(kwargs) == 2 and "role" in kwargs and "content" in kwargs:
         return (kwargs['role'], kwargs['content'])
-    
+
     result:Dict[str,str]={}
     for key in kwargs:
         result[key] = str(kwargs[key])
@@ -39,9 +39,10 @@ class light_llama_core(abs_llm_core):
                  model:         Union[str, tool_file, ChatLlamaCpp],
                  init_message:  Union[MessageObject, List[MessageObject]]   = [],
                  temperature:   float                                       = 0.8,
+                 is_record_result_to_history:bool                           = True,
                  *args, **kwargs):
         if init_message is None:
-            init_message = []   
+            init_message = []
         if isinstance(init_message, List) is False:
             if isinstance(init_message, str):
                 init_message = make_system_prompt(init_message)
@@ -53,23 +54,37 @@ class light_llama_core(abs_llm_core):
         self.hestroy_message_list   :List[MessageObject]    = self.init_message_list.copy()
         self.model                  :ChatLlamaCpp           = model
         self.last_result            :BaseMessage            = None
-    
+        self.is_record_result_to_history:bool               = is_record_result_to_history
+
     def __str__(self):
         return str(self.hestroy_message_list)
-    @override
-    def __call__(self, message:Union[str, MessageObject]):
+
+    def internal_call_with_recording(self, message:MessageObject):
         try:
-            self.hestroy_message_list.append(make_human_prompt(message))
-            result = self.model.invoke(self.hestroy_message_list)
-            self.hestroy_message_list.append(make_assistant_prompt(result.content))
-            self.last_result = result
+            self.append_hestroy(message)
+            self.last_result = self.model.invoke(self.hestroy_message_list)
+            self.append_hestroy(make_assistant_prompt(self.last_result.content))
         except ValueError:
-            #self.pop_front_hestory()
-            #self.pop_hestroy()
-            self.clear_hestroy()
-            self.__call__(message)
+            self.pop_front_hestory()
+            self.pop_hestroy()
+            self.internal_call_with_recording(message)
         return self.last_result
-    
+
+    def internal_call_with_norecording(self, message:MessageObject):
+        self.append_hestroy(message)
+        result = self.model.invoke(self.hestroy_message_list)
+        self.pop_hestroy()
+        self.last_result = result
+        return result
+
+    @override
+    def __call__(self, message:Union[str, MessageObject]) -> BaseMessage:
+        message_object:MessageObject = make_human_prompt(message) if isinstance(message, str) else message
+        if self.is_record_result_to_history:
+            return self.internal_call_with_recording(message_object)
+        else:
+            return self.internal_call_with_norecording(message_object)
+
     def set_init_message(self, init_message:Union[MessageObject, List[MessageObject]]):
         self.clear_hestroy()
         if isinstance(init_message, List) is False:
@@ -79,7 +94,7 @@ class light_llama_core(abs_llm_core):
                 init_message = [init_message]
         self.init_message_list = init_message
         return self
-   
+
     def pop_front_hestory(self):
         if len(self.hestroy_message_list) > len(self.init_message_list):
             self.hestroy_message_list.pop(len(self.init_message_list))
@@ -113,7 +128,7 @@ class light_llama_core(abs_llm_core):
         file.open('rb')
         file.refresh()
         self.hestroy_message_list = file.data
-    
+
     def get_last_message(self):
         return self.hestroy_message_list[-1]
     def append_message(self, message:MessageObject):
@@ -128,18 +143,18 @@ class light_llama_core(abs_llm_core):
         **kwargs: Any,
     ) -> Runnable[MessageObject, BaseMessage]:
         return self.model.bind_tools(tools, tool_choice=tool_choice, **kwargs)
-        
+
     def with_structured_output(
         self,
         schema:         Union[Dict, Type[BaseModel]],
         include_raw:    bool                            = False
     ) -> Runnable[MessageObject, Union[Dict, BaseModel]]:
         return self.model.with_structured_output(schema, include_raw=include_raw)
-    
+
     def with_stream_output(self, message:MessageObject, callback:Callable[[str], None]):
         for iter in self.model.stream(message):
             callback(iter)
-        
+
 def Wrapper(model:Union[str, tool_file]):
     return light_llama_core(UnWrapper(model))
 
@@ -147,8 +162,8 @@ def Wrapper(model:Union[str, tool_file]):
 
 class runnable_llama_call(abs_llm_callable):
     def __init__(self, core:light_llama_core):
-        self.core:          light_llama_core                        = core
-        
+        self.core:  light_llama_core    = core
+
     @override
     def __call__(self, message:Union[str, MessageObject]) -> BaseMessage:
         return self.core(message)
@@ -162,7 +177,7 @@ class runnable_llama_prompt_call(Callable[[dict], BaseMessage]):
         self.prompt:        ChatPromptTemplate                      = prompt
         self.last_result:   BaseMessage                             = None
         self.chain:         RunnableSerializable[dict, BaseMessage] = self.prompt|self.core.model
-        
+
     @override
     def __call__(self, message_inserter:dict, **kwargs) -> BaseMessage:
         #self.core.append_hestroy() ##what need to set with ai role
@@ -170,7 +185,7 @@ class runnable_llama_prompt_call(Callable[[dict], BaseMessage]):
         self.last_result = self.chain.invoke(combine_inserter)
         self.core.append_hestroy(make_human_prompt(self.last_result.content))
         return self.last_result.content
-        
+
 class light_llama_prompt(Callable[[light_llama_core], runnable_llama_prompt_call]):
     '''
     prompt = ChatPromptTemplate.from_messages(
@@ -180,7 +195,7 @@ class light_llama_prompt(Callable[[light_llama_core], runnable_llama_prompt_call
                 "You are a helpful assistant that translates {input_language} to {output_language}.",
             ),
             (
-                "human", 
+                "human",
                 "{input}"
             ),
         ]
@@ -200,31 +215,31 @@ class light_llama_prompt(Callable[[light_llama_core], runnable_llama_prompt_call
     def __init__(self, core:light_llama_core=None):
         self.prompt:    List[Tuple[str, str]]           = []
         self.core:      light_llama_core                = core
-        
+
     def from_single_chat(self, role:MessageType, message_format:str):
         self.prompt.append((role, message_format))
         return self
-    
+
     def append(self, role:MessageType, message_format:str, /):
         return self.from_single_chat(role, message_format)
     def __or__(self, role:MessageType, message_format:str, /):
         return self.from_single_chat(role, message_format)
-    
+
     def s_append(self, message_format:str):
         return self.append("system", message_format)
     def h_append(self, message_format:str):
         return self.append("human", message_format)
-    
+
     def __call__(self, core:light_llama_core=None) -> runnable_llama_prompt_call:
         if core is None:
             core = self.core
         if core is None:
             raise Exception("core is None")
         return runnable_llama_prompt_call(
-            core, 
+            core,
             ChatPromptTemplate.from_messages(self.prompt)
             )
-    
+
 def make_llama_prompt_call(core:light_llama_core, prompts:Sequence[Tuple[MessageType, str]]):
     prompt = light_llama_prompt(core)
     for role, message_format in prompts:
@@ -235,13 +250,13 @@ class runable_llama_tool_call_result(Callable[[], BaseMessage]):
     def __init__(self, tool_function, tool_calls_result:List[ToolCall]):
         self.tool_function:     Runnable[MessageObject, BaseMessage]    = tool_function
         self.tool_calls_result: List[ToolCall]                          = tool_calls_result
-        
+
     def __call__(self) -> BaseMessage:
         return self.tool_function.invoke(self.tool_calls_result[0].args)
 
 class runnable_llama_tool_call(Callable[[Union[str, MessageObject]], Any]):
     def __init__(
-        self, 
+        self,
         core:           light_llama_core,
         tool_function:  Union[Dict[str, Any], Type[BaseModel], Callable, BaseTool],
         tool_choice:    str,
@@ -253,13 +268,13 @@ class runnable_llama_tool_call(Callable[[Union[str, MessageObject]], Any]):
             [tool_function],
             tool_choice=self.make_tool_choice(tool_choice),
             **kwargs)
-        
+
     def make_tool_choice(self, tool_choice_name:str):
         return {
-            "type": "function", 
+            "type": "function",
             "function": {"name": tool_choice_name}
             }
-        
+
     @override
     def __call__(self, message:Union[str, MessageObject]) -> BaseMessage:
         self.last_result:AIMessage = self.toolcall.invoke(message)
@@ -267,7 +282,7 @@ class runnable_llama_tool_call(Callable[[Union[str, MessageObject]], Any]):
 
 class light_llama_functioncall(Callable[[Union[str, MessageObject]], Sequence[Any]]):
     def __init__(
-            self, 
+            self,
             core:           light_llama_core,
             tools:          Sequence[Runnable[MessageObject, BaseMessage]],
             tool_choice:    str = None,
@@ -280,13 +295,13 @@ class light_llama_functioncall(Callable[[Union[str, MessageObject]], Sequence[An
         for tool in tools:
             self.formatted_tools[convert_to_openai_tool(tool)["function"]["name"]] = tool
         self.bind_tools(tools, tool_choice=self.make_tool_choice(tool_choice), **kwargs)
-        
+
     def make_tool_choice(self, tool_choice_name:str):
         return {
-            "type": "function", 
+            "type": "function",
             "function": {"name": tool_choice_name}
             }
-        
+
     def bind_tools(
             self,
             tools: Sequence[Union[Dict[str, Any], Type[BaseModel], Callable, BaseTool]],
@@ -296,7 +311,7 @@ class light_llama_functioncall(Callable[[Union[str, MessageObject]], Sequence[An
     ) -> Runnable[MessageObject, BaseMessage]:
         self.target = self.core.bind_tools(tools, tool_choice=tool_choice, **kwargs)
         return self
-    
+
     def __call__(self, message:Union[str, MessageObject]) -> Dict[str, Any]:
         self.last_ai_message:   AIMessage       = self.target.invoke(message)
         self.last_tool_calls:   List[ToolCall]  = self.last_ai_message.tool_calls
@@ -324,21 +339,21 @@ def make_llama_functioncall(
     **kwargs: Any,
     ) -> light_llama_functioncall:
     return light_llama_functioncall(
-        core, 
-        tool_functions if isinstance(tool_functions, Sequence) else [tool_functions], 
+        core,
+        tool_functions if isinstance(tool_functions, Sequence) else [tool_functions],
         tool_choice=tool_choice_name,
         **kwargs)
 
 class runnable_llama_structured_call(Callable[[Union[str, MessageObject]], Union[Dict, BaseModel]]):
     def __init__(
-            self, 
+            self,
             core:           light_llama_core,
             schema:         Union[Dict, Type[BaseModel]],
             include_raw:    bool                            = False
         ):
         self.core:              light_llama_core                                = core
         self.structured_call:   Runnable[MessageObject, Union[Dict, BaseModel]] = core.with_structured_output(schema, include_raw)
-        
+
     def __call__(self, message:Union[str, MessageObject]) -> Union[Dict, BaseModel]:
         return self.structured_call.invoke(message)
 
@@ -350,13 +365,13 @@ def make_llama_structured_call(
     return runnable_llama_structured_call(core, schema, include_raw)
 
 # Template Of FunctionCall Defined
-    
+
 class Internal_TemplateFunctionInput(BaseModel):
     function_input: int = Field(description="The input value for function")
 
 @FunctionTool("get_function", args_schema=Internal_TemplateFunctionInput)
 def magic_function(function_input: int):
     """Get the value of function for an input."""
-    return function_input + 1  
+    return function_input + 1
 
 # LLM Chain

@@ -263,7 +263,7 @@ class tool_file(any_class):
         return self
     def save_as_json(self, path:str):
         path = path if path else self.__file_path
-        json.dump(self.data, self.__file)
+        json.dump(self.data, self.__file, indent=4)
         return self
     def save_as_csv(self, path:str):
         path = path if path else self.__file_path
@@ -343,6 +343,8 @@ class tool_file(any_class):
             return get_base_filename(self.__file_path)
     def get_dir(self):
         return os.path.dirname(self.__file_path)
+    def get_dir_tool_file(self):
+        return tool_file(self.get_dir())
     def get_current_dir_name(self):
         return os.path.dirname(self.__file_path)
 
