@@ -423,7 +423,7 @@ class tool_file(any_class):
         onerror:        Optional[Callable] = None,
         followlinks:    bool               = False
         ) -> Iterator[tuple[dir_name_type, list[dir_name_type], list[file_name_type]]]:
-        return os.walk(self.__file_path)
+        return os.walk(self.__file_path, top=top, topdown=topdown, onerror=onerror, followlinks=followlinks)
 
     def append_text(self, line:str):
         if self.has_data_type_is(type(str)):
@@ -439,13 +439,11 @@ class tool_file(any_class):
     def __bool__(self):
         return self.exists()
 
-    def must_exists_as_new(self):
+    def must_exists_path(self):
         self.close()
         self.try_create_parent_path()
         self.create()
         return self
-    def must_exists_path(self):
-        return self.must_exists_as_new()
 
     def make_file_inside(self, data:Self, is_delete_source = False):
         if self.is_dir() is False:

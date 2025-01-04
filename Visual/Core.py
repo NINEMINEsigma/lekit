@@ -1,27 +1,21 @@
 from typing                 import *
 import matplotlib.pyplot    as     plt
 import seaborn              as     sns
-import pandas               as     pd
-from lekit.File.Core        import tool_file
-import                             cv2
-import numpy                as     np
+from lekit.File.Core        import tool_file, Wrapper as Wrapper2File, tool_file_or_str
 
-class light_visual:
-    def __init__(self, file:tool_file=None):
-        self._file=file
-        if self._file is not None:
-            self._file.load()
+class data_visual_generator:
+    def __init__(self, file:tool_file_or_str):
+        self._file:tool_file = Wrapper2File(file)
+        self._file.load()
 
-    def reload(self, file_path:str=None):
-        if file_path is None and self._file is not None:
-            self._file.load()
-        elif file_path is not None:
-            self._file=tool_file(file_path)
-            self._file.load()
-        elif self._file is not None:
-            self._file.load()
-        else:
-            raise Exception("file_path is None and self.__file is None")
+    def open(self, mode='r', is_refresh=False, encoding:str='utf-8', *args, **kwargs):
+        self._file.open(mode, is_refresh, encoding, *args, **kwargs)
+
+    def reload(self, file:Optional[tool_file_or_str]):
+        if file is not None:
+            self._file = Wrapper2File(file)
+        self._file.load()
+
 
     def plot_line(self, x, y, df=None, title="折线图", x_label=None, y_label=None):
         plt.figure(figsize=(10, 6))
@@ -63,7 +57,7 @@ class light_visual:
         sns.pairplot(df if df is not None else self._file.data)
         plt.suptitle(title, y=1.02)
         plt.show()
-    
+
     def plot_pie(self, column, figsize=(10,6), df=None, title="饼图"):
         plt.figure(figsize=figsize)
         if df is not None:
@@ -119,19 +113,7 @@ class light_visual:
     def plot_jointplot_hex(self, x, y, df=None, title="联合图", x_label=None, y_label=None):
         self.plot_jointplot(x, y, kind="hex", df=df, title=title, x_label=x_label, y_label=y_label)
 
-
-    def read_image(self):
-        return cv2.imread(self._file.get_path())
-
-    def show_image(self, name):
-        cv2.imshow(name, self.read_image())
-        cv2.waitKey(0)
-        cv2.destroyWindow(name)
-
-    def save_image(self, image):
-        cv2.imwrite(self._file.get_path(), image)
-
-class light_math_virsual(light_visual):
+class data_math_virsual_generator(data_visual_generator):
     def drop_missing_values(self, axis):
         """删除缺失值"""
         self._file.data = self._file.data.dropna(axis=axis)

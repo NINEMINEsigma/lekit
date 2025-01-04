@@ -1,4 +1,5 @@
 from typing                         import *
+from lekit.Internal                 import *
 import numpy                        as     np
 import scipy                        as     sci_base
 from scipy          import optimize as     sci_opt
@@ -21,12 +22,71 @@ NpFloatNumber           = Union[
     np.float32,
     np.float64,
 ]
-NumberLike              = Union[
+NumberTypeOf_Float_Int_And_More = Union[
     BasicIntFloatNumber,
     NpSignedIntNumber,
     NpUnsignedIntNumber,
     NpFloatNumber
 ]
+NumberLike              = NumberTypeOf_Float_Int_And_More
+class left_number_reference(left_value_reference[NumberLike]):
+    def __add__(self, value:NumberLike):
+        return self.ref_value + value
+    def __sub__(self, value:NumberLike):
+        return self.ref_value - value
+    def __mul__(self, value:NumberLike):
+        return self.ref_value * value
+    def __truediv__(self, value:NumberLike):
+        return self.ref_value / value
+    def __floordiv__(self, value:NumberLike):
+        return self.ref_value // value
+    def __mod__(self, value:NumberLike):
+        return self.ref_value % value
+    def __pow__(self, value:NumberLike):
+        return self.ref_value ** value
+    def __radd__(self, value:NumberLike):
+        return value + self.ref_value
+    def __rsub__(self, value:NumberLike):
+        return value - self.ref_value
+    def __rmul__(self, value:NumberLike):
+        return value * self.ref_value
+    def __rtruediv__(self, value:NumberLike):
+        return value / self.ref_value
+    def __rfloordiv__(self, value:NumberLike):
+        return value // self.ref_value
+    def __rmod__(self, value:NumberLike):
+        return value % self.ref_value
+    def __rpow__(self, value:NumberLike):
+        return value ** self.ref_value
+    def __neg__(self):
+        return -self.ref_value
+    def __pos__(self):
+        return self.ref_value
+    def __abs__(self):
+        return abs(self.ref_value)
+    def __round__(self, ndigits:Optional[int]=None):
+        return round(self.ref_value, ndigits)
+    def __eq__(self, value:NumberLike):
+        return self.ref_value == value
+    def __ne__(self, value:NumberLike):
+        return self.ref_value != value
+    def __lt__(self, value:NumberLike):
+        return self.ref_value < value
+    def __le__(self, value:NumberLike):
+        return self.ref_value <= value
+    def __gt__(self, value:NumberLike):
+        return self.ref_value > value
+    def __ge__(self, value:NumberLike):
+        return self.ref_value >= value
+    def __bool__(self):
+        return bool(self.ref_value)
+    def __hash__(self):
+        return hash(self.ref_value)
+    def __repr__(self):
+        return str(self.ref_value)
+    def __str__(self):
+        return str(self.ref_value)
+
 
 NumberInstanceOrContainer = Union[
     NumberLike,

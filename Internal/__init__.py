@@ -39,7 +39,12 @@ def dynamic_cast[_T](from_) -> Optional[_T]:
 def reinterpret_cast[_T](from_) -> _T:
     raise NotImplementedError("Python does not support reinterpret_cast anyways")
 
-type Action[_T] = Callable[[], _T]
+type Action[_T] = Callable[[_T], None]
+type Action2[_T1, _T2] = Callable[[_T1, _T2], None]
+type Action3[_T1, _T2, _T3] = Callable[[_T1, _T2, _T3], None]
+type Action4[_T1, _T2, _T3, _T4] = Callable[[_T1, _T2, _T3, _T4], None]
+type Action5[_T1, _T2, _T3, _T4, _T5] = Callable[[_T1, _T2, _T3, _T4, _T5], None]
+type ActionW = Callable[[Sequence[Any]], None]
 
 class type_class(ABC):
     def GetType(self):
@@ -67,6 +72,15 @@ class base_value_reference[_T](type_class):
         if self._ref_value is None:
             return "null"
         return str(self._ref_value)
+
+    def __repr__(self):
+        if self._ref_value is None:
+            return "null"
+        return self._ref_value.__repr__()
+    def __str__(self):
+        if self._ref_value is None:
+            return "null"
+        return str(self._ref_value)
 class left_value_reference[_T](base_value_reference):
     def __init__(self, ref_value:_T):
         super().__init__(ref_value)
@@ -80,6 +94,10 @@ class left_value_reference[_T](base_value_reference):
         else:
             raise TypeError(f"Cannot assign {type(value)} to {self.GetType()}")
         return value
+    def __bool__(self):
+        return self._ref_value is not None
+    def is_empty(self):
+        return self._ref_value is None
 class right_value_refenence[_T](type_class):
     def __init__(self, ref_value:_T):
         super().__init__(ref_value)
@@ -131,6 +149,106 @@ class any_class(type_class, ABC):
         ) -> Optional[bool]:
         return True
 
+class null_package[_T](left_value_reference[_T]):
+    @override
+    def __init__(self, ref_value:_T):
+        super().__init__(ref_value)
+
+    def Try[_Ret](
+        self,
+        call:Union[Callable[[_T], _Ret]]
+        ) -> Union[Self, _Ret]:
+        if _Ret == type(None):
+            call(self.ref_value)
+            return self
+        else:
+            return call(self.ref_value)
+class closures[_T](left_value_reference[_T]):
+    @override
+    def __init__(self, ref_value:_T, callback:Action[_T]):
+        super().__init__(ref_value)
+        self.callback = callback
+    def invoke(self):
+        if self.callback is None:
+            return
+        self.callback(self.ref_value)
+        self.callback = None
+class release_closures[_T](closures[_T]):
+    @override
+    def __init__(self, ref_value:_T, callback:Action[_T]):
+        super().__init__(ref_value)
+        self.callback = callback
+    def __del__(self):
+        self.invoke()
+# LightDiagram::ld::instance<_Ty>
+class restructor_instance[_Ty](left_value_reference[_Ty]):
+    def __init__(
+        self,
+        target:             _Ty,
+        *,
+        constructor_func:   Optional[Callable[[_Ty], None]] = None,
+        destructor_func:    Optional[Callable[[_Ty], None]] = None
+        ):
+        super().__init__(target)
+        if constructor_func:
+            constructor_func(self.ref_value)
+        self.destructor_func = destructor_func
+    def __del__(self):
+        if self.destructor_func:
+            self.destructor_func(self.ref_value)
+
+    def get_ref(self):
+        return self.ref_value
+    def is_empty(self):
+        return self.ref_value is None
+
+class iter_builder[_T](any_class):
+    def __init__(self,  pr:Callable[[], bool], returner:Callable[[], _T]):
+        self.pr = pr
+        self.returner = returner
+    def __iter__(self):
+        return self
+    def __next__(self):
+        if self.pr():
+            return self.returner()
+        raise StopIteration
+class iter_callable_range(Callable[[], bool], any_class):
+    def __init__(
+        self,
+        start:  Union[int, left_value_reference[int]],
+        stop:   Union[int, left_value_reference[int]],
+        step=1
+        ):
+        self.__start = start
+        self.__stop = stop
+        self.__start_is_real_value = isinstance(start, int)
+        self.__stop_is_real_value = isinstance(stop, int)
+        self.step = step
+    @property
+    def start(self):
+        return self.__start if self.__start_is_real_value else self.__start.ref_value
+    @start.setter
+    def start(self, value:int):
+        if self.__start_is_real_value:
+            self.__start = value
+        else:
+            self.__start.ref_value = value
+    @property
+    def stop(self):
+        return self.__stop if self.__stop_is_real_value else self.__stop.ref_value
+    @stop.setter
+    def stop(self, value:int):
+        if self.__stop_is_real_value:
+            self.__stop = value
+        else:
+            self.__stop.ref_value = value
+    def __call__(self):
+        start = self.start
+        stop = self.stop
+        result = start<stop
+        self.start = start + self.step
+        return result
+
 # region instance
 
 # threads
@@ -165,9 +283,8 @@ class thread_instance(threading.Thread, any_class):
 class atomic[_T](any_class):
     def __init__(
         self,
-        *,
+        value:  Optional[_T] = None,
         locker: Optional[threading.Lock] = None,
-        value:  Optional[_T] = None
         ):
         self.__value:   _T = value
         self.__is_in_with: bool = False
@@ -227,8 +344,41 @@ class atomic[_T](any_class):
             self.__value = value
         raise NotImplementedError("This method can only be called within a with statement")
 
-
 # region end
+
+def create_py_file(path:str):
+    with open(path, "w") as f:
+        f.write("""# -*- coding: utf-8 -*-\n""")
+        f.write("\n")
+        f.write(f"if __name__ == \"__main__\":\n")
+        f.write("\tpass\n")
+
+_TargetType = TypeVar("TargetType")
+def WrapperConfig2Instance(
+    typen_or_generater:             Union[type, Callable[[Any], _TargetType]],
+    datahead_of_config_or_instance: Optional[Union[
+            Dict[str, Any], # kwargs
+            Sequence[Any],  # args
+            _TargetType,            # typen or datahead
+        ]],
+    *args,
+    datahead_typen_:                 Optional[type] = None,
+    **kwargs
+    ) -> _TargetType:
+    if typen_or_generater is None:
+        raise ValueError("typen cannt be none")
+    if datahead_of_config_or_instance is None:
+        return typen_or_generater(*args, **kwargs)
+    elif datahead_typen_ is not None and isinstance(datahead_of_config_or_instance, datahead_typen_):
+        return datahead_of_config_or_instance
+    elif isinstance(typen_or_generater, type) and isinstance(datahead_of_config_or_instance, typen_or_generater):
+        return datahead_of_config_or_instance
+    elif isinstance(datahead_of_config_or_instance, dict):
+        return typen_or_generater(*args, **datahead_of_config_or_instance, **kwargs)
+    elif isinstance(datahead_of_config_or_instance, Sequence):
+        return typen_or_generater(*datahead_of_config_or_instance, *args, **kwargs)
+    else:
+        return typen_or_generater(datahead_of_config_or_instance, *args, **kwargs)
 
 if __name__ == "__main__":
     ref = left_value_reference[int](5.5)

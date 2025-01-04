@@ -2,8 +2,9 @@ from lekit.Internal import *
 
 try:
     from lekit.File.Core        import tool_file as _
+    from lekit.MathEx.Core      import np as _
 except ImportError:
-    InternalImportingThrow("Visual", ["File"])
+    InternalImportingThrow("Visual", ["File", "MathEx"])
 
 # Import Core.py
 try:
@@ -31,3 +32,10 @@ try:
     from lekit.Visual.WordCloud import *
 except ImportError as ex:
     ImportingThrow(ex, "WordCloud", ["wordcloud"])
+
+# Import Manim.py
+try:
+    import manim as _
+    from lekit.Visual.Manim import *
+except ImportError as ex:
+    ImportingThrow(ex, "Manim", ["manim"])
