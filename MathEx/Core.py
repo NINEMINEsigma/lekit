@@ -133,8 +133,6 @@ def Wrapper2Lvn(value:Union[
         return left_number_reference(value)
     else:
         return left_number_reference(value.ref_value)
-def UnwrapperLvn(value:left_number_reference):
-    return value.ref_value
 class left_np_ndarray_reference(left_number_reference):
     '''
     针对np.ndarray的特化引用:
@@ -144,6 +142,29 @@ class left_np_ndarray_reference(left_number_reference):
         super().__init__(ref_value)
     def where(self, pr:NumberLike):
         return np.where(pr(self.ref_value))
+
+    def __array__(self) -> np.ndarray:
+        return self.ref_value
+    def get_array(self) -> np.ndarray:
+        return self.ref_value
+    # 序列合并
+    def _inject_stack_uniform_item(self):
+        return self.get_array()
+    def stack(self, *args:Self, **kwargs) -> Self:
+        container = [self]
+        container.extend([item for item in args])
+        return np.stack([
+            item._inject_stack_uniform_item() for item in container
+            ], *args, **kwargs)
+    def vstack(self, *args:Self) -> Self:
+        container = [self]
+        container.extend([item for item in args])
+        return np.vstack([item._inject_stack_uniform_item() for item in container])
+    def hstack(self, *args:Self) -> Self:
+        container = [self]
+        container.extend([items for items in args])
+        return np.hstack([item._inject_stack_uniform_item() for item in container]))
+
 
 
 NumberInstanceOrContainer = Union[
