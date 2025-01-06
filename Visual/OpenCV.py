@@ -7,8 +7,12 @@ from cv2.typing         import *
 import numpy            as     np
 from PIL                import ImageFile, Image
 
+from lekit.MathEx.Core  import *
 from lekit.Str.Core     import UnWrapper as Unwrapper2Str
-from lekit.File.Core    import tool_file, Wrapper as Wrapper2File
+from lekit.File.Core    import tool_file, Wrapper as Wrapper2File, tool_file_or_str
+
+# OpenCV Image format is BGR
+# PIL Image format is RBG
 
 VideoWriter = base.VideoWriter
 def mp4_with_MPEG4_fourcc() -> int:
@@ -225,7 +229,15 @@ class light_cv_camera(light_cv_view, any_class):
     def ToString(self):
         return f"Camera<{self.width}x{self.height}>"
 
-class ImageObject(any_class):
+class ImageObject(left_np_ndarray_reference):
+    @property
+    def __image(self) -> MatLike:
+        return self.ref_value
+    @__image.setter
+    def __image(self, value:MatLike) -> MatLike:
+        self.ref_value = value
+        return value
+
     def __init__(
         self,
         image:          Optional[Union[
@@ -239,13 +251,18 @@ class ImageObject(any_class):
             Image.Image
             ]],
         flags:          int             = -1):
-        self.__image:   MatLike         = None
+        super().__init__()
         self.__camera:  light_cv_camera = None
         self.current:   MatLike         = None
         if isinstance(image, light_cv_camera):
             self.lock_from_camera(image)
         else:
             self.load_image(image, flags)
+
+    def internal_check_when_image_is_none_throw_error(self):
+        if self.image is None:
+            raise ValueError("Image is None")
+        return self
 
     @override
     def SymbolName(self):
@@ -319,8 +336,8 @@ class ImageObject(any_class):
         return self.image.ndim
 
     @property
-    def shape(self) -> Tuple[int, int, int]:
-        '''height, width, depth'''
+    def shape(self) -> Tuple[int, ...]:
+        '''height, width, [depth, ...]'''
         return self.image.shape
     @property
     def height(self) -> int:
@@ -355,7 +372,7 @@ class ImageObject(any_class):
         if image is None:
             self.__image = None
             return self
-        elif isinstance(image, type(self)):
+        elif isinstance(image, ImageObject):
             self.__image = image.image
         elif isinstance(image, MatLike):
             self.__image = image
@@ -637,78 +654,45 @@ class ImageObject(any_class):
         func(self.image, *args, **kwargs)
         return self
 
-    def stack(self, *args:Self, **kwargs) -> Self:
-        images = [ image for image in args]
-        images.append(self)
-        return ImageObject(np.stack([np.uint8(image.image) for image in images], *args, **kwargs))
-    def vstack(self, *args:Self) -> Self:
-        images = [ image for image in args]
-        images.append(self)
-        return ImageObject(np.vstack([np.uint8(image.image) for image in images]))
-    def hstack(self, *args:Self) -> Self:
-        images = [ image for image in args]
-        images.append(self)
-        return ImageObject(np.hstack([np.uint8(image.image) for image in images]))
+    # 序列合并
+    @override
+    def _inject_stack_uniform_item(self):
+        return np.uint8(self.image)
 
+    # 从另一图像合并
     def merge_with_blending(self, other:Self, weights:Tuple[float, float]):
         return ImageObject(base.addWeighted(self.image, weights[0], other.image, weights[1], 0))
+    # 从另一图像合并(遮罩)
+    def merge_with_mask(self, other:Self, mask:Self):
+        return ImageObject(base.bitwise_and(self.image, other.image, mask.image))
 
-    def add(self, image_or_value:Union[Self, int]):
-        if isinstance(image_or_value, int):
-            self.image = base.add(self.image, image_or_value)
+    # 阈值
+    def clamp(self, mini:Any, maxi:Optional[Any]=None):
+        cur_mini = None
+        cur_maxi = None
+        if maxi is None:
+            cur_mini, cur_maxi = 0, mini
         else:
-            self.image = base.add(self.image, image_or_value.image)
-        return self
-    def __add__(self, image_or_value:Union[Self, int]):
-        return ImageObject(self.image.copy()).add(image_or_value)
-    def subtract(self, image_or_value:Union[Self, int]):
-        if isinstance(image_or_value, int):
-            self.image = base.subtract(self.image, image_or_value)
-        else:
-            self.image = base.subtract(self.image, image_or_value.image)
-        return self
-    def __sub__(self, image_or_value:Union[Self, int]):
-        return ImageObject(self.image.copy()).subtract(image_or_value)
-    def multiply(self, image_or_value:Union[Self, int]):
-        if isinstance(image_or_value, int):
-            self.image = base.multiply(self.image, image_or_value)
-        else:
-            self.image = base.multiply(self.image, image_or_value.image)
-        return self
-    def __mul__(self, image_or_value:Union[Self, int]):
-        return ImageObject(self.image.copy()).multiply(image_or_value)
-    def divide(self, image_or_value:Union[Self, int]):
-        if isinstance(image_or_value, int):
-            self.image = base.divide(self.image, image_or_value)
-        else:
-            self.image = base.divide(self.image, image_or_value.image)
-        return self
-    def __truediv__(self, image_or_value:Union[Self, int]):
-        return ImageObject(self.image.copy()).divide(image_or_value)
-    def bitwise_and(self, image_or_value:Union[Self, int]):
-        if isinstance(image_or_value, int):
-            self.image = base.bitwise_and(self.image, image_or_value)
-        else:
-            self.image = base.bitwise_and(self.image, image_or_value.image)
-        return self
-    def bitwise_or(self, image_or_value:Union[Self, int]):
-        if isinstance(image_or_value, int):
-            self.image = base.bitwise_or(self.image, image_or_value)
-        else:
-            self.image = base.bitwise_or(self.image, image_or_value.image)
-        return self
-    def bitwise_xor(self, image_or_value:Union[Self]):
-        if isinstance(image_or_value, int):
-            self.image = base.bitwise_xor(self.image, image_or_value)
-        else:
-            self.image = base.bitwise_xor(self.image, image_or_value.image)
-        return self
-    def bitwise_not(self):
-        self.image = base.bitwise_not(self.image)
-        return self
-    def __neg__(self):
-        return ImageObject(self.image.copy()).bitwise_not()
+            cur_mini, cur_maxi = mini, maxi
+        mini_mask = np.where(self.image < cur_mini)
+        maxi_mask = np.where(self.image > cur_maxi)
+        self.image[mini_mask] = cur_mini
+        self.image[maxi_mask] = cur_maxi
 
+def get_new_noise(
+    raw_image:  Optional[MatLike],
+    height:     int,
+    weight:     int,
+    *,
+    mean:       float   = 0,
+    sigma:      float   = 25,
+    dtype               = np.uint8
+    ) -> MatLike:
+    noise = raw_image
+    if noise is None:
+        noise = np.zeros((height, weight), dtype=dtype)
+    base.randn(noise, mean, sigma)
+    return base.cvtColor(noise, base.COLOR_GRAY2BGR)
 class NoiseImageObject(ImageObject):
     def __init__(
         self,
@@ -719,29 +703,13 @@ class NoiseImageObject(ImageObject):
         sigma:      float   = 25,
         dtype               = np.uint8
         ):
-        super().__init__(NoiseImageObject.get_new_noise(
+        super().__init__(get_new_noise(
             None, height, weight, mean=mean, sigma=sigma, dtype=dtype
             ))
 
     @override
     def SymbolName(self):
         return "Noise"
-
-    @classmethod
-    def get_new_noise(
-        raw_image:  Optional[MatLike],
-        height:     int,
-        weight:     int,
-        *,
-        mean:       float   = 0,
-        sigma:      float   = 25,
-        dtype               = np.uint8
-        ) -> MatLike:
-        noise = raw_image
-        if noise is None:
-            noise = np.zeros((height, weight), dtype=dtype)
-        base.randn(noise, mean, sigma)
-        return base.cvtColor(noise, base.COLOR_GRAY2BGR)
 
 def Unwrapper(image:Optional[Union[
             str,
@@ -881,17 +849,27 @@ if __name__ == "__main__":
 # Override tool_file to tool_file_ex
 
 class tool_file_cvex(tool_file):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self,  file_path:str, *args, **kwargs):
+        super().__init__(file_path, *args, **kwargs)
 
     @override
-    def load_as_image(self) -> ImageObject:
-        self.data = ImageObject(self.get_path())
+    def load(self) -> ImageObject:
+        self.data = ImageObject(self)
         return self.data
-
     @override
     def save(self, path = None):
         image:ImageObject   = self.data
         image.save_image(path if path is not None else self.get_path())
         return self
 
+def WrapperFile2CVEX(file:Union[tool_file_or_str, tool_file_cvex]):
+    if isinstance(file, tool_file_cvex):
+        return file
+    elif isinstance(file, str):
+        return tool_file_cvex(file)
+    elif isinstance(file, tool_file):
+        result = tool_file_cvex(Unwrapper2Str(file))
+        result.data = file.data
+        return result
+    else:
+        raise TypeError("file must be tool_file or str")

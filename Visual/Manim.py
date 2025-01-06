@@ -7,11 +7,13 @@ from manim.mobject.mobject  import Mobject
 from manim                  import typing as MTypes
 
 # init env
-if True:
+def init_manim_dir_env():
     with tool_file("media/").must_exists_path() as assets:
         (assets|"videos/").must_exists_path()
         (assets|"images/").must_exists_path()
         (assets|"Tex/").must_exists_path()
+if False:
+    init_manim_dir_env()
 
 VectorFrontward = base.OUT
 VectorBackward = base.IN

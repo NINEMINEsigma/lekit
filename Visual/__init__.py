@@ -11,7 +11,7 @@ try:
     import matplotlib.pyplot    as     _
     import seaborn              as     _
     import pandas               as     _
-    import cv2 as _
+    import cv2                  as _
     import numpy                as _
     from lekit.Visual.Core import *
 except ImportError as ex:

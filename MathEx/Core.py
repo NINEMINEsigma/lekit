@@ -26,50 +26,73 @@ NumberTypeOf_Float_Int_And_More = Union[
     BasicIntFloatNumber,
     NpSignedIntNumber,
     NpUnsignedIntNumber,
-    NpFloatNumber
+    NpFloatNumber,
+    np.ndarray
 ]
 NumberLike              = NumberTypeOf_Float_Int_And_More
 class left_number_reference(left_value_reference[NumberLike]):
+    def __init__(self, ref_value:NumberLike):
+        super().__init__(ref_value)
+    def is_array(self):
+        return isinstance(self.ref_value, np.ndarray)
+    def is_scalar(self):
+        return not self.is_array()
+    @property
+    def ndim(self):
+        if self.is_empty():
+            return -1
+        elif self.is_array():
+            return self.ref_value.ndim
+        else:
+            return 0
+    @property
+    def shape(self):
+        if self.is_empty():
+            return (-1)
+        elif self.is_array():
+            return self.ref_value.shape
+        else:
+            return (0)
     def __add__(self, value:NumberLike):
-        return self.ref_value + value
+        return np.add(self.ref_value, value)
     def __sub__(self, value:NumberLike):
-        return self.ref_value - value
+        return np.subtract(self.ref_value, value)
     def __mul__(self, value:NumberLike):
-        return self.ref_value * value
+        return np.multiply(self.ref_value, value)
     def __truediv__(self, value:NumberLike):
-        return self.ref_value / value
+        return np.true_divide(self.ref_value, value)
     def __floordiv__(self, value:NumberLike):
-        return self.ref_value // value
+        return np.floor_divide(self.ref_value, value)
     def __mod__(self, value:NumberLike):
-        return self.ref_value % value
+        return np.mod(self.ref_value, value)
     def __pow__(self, value:NumberLike):
-        return self.ref_value ** value
+        return np.pow(self.ref_value, value)
     def __radd__(self, value:NumberLike):
-        return value + self.ref_value
+        return np.add(value, self.ref_value)
     def __rsub__(self, value:NumberLike):
-        return value - self.ref_value
+        return np.subtract(value, self.ref_value)
     def __rmul__(self, value:NumberLike):
-        return value * self.ref_value
+        return np.multiply(value, self.ref_value)
     def __rtruediv__(self, value:NumberLike):
-        return value / self.ref_value
+        return np.true_divide(value, self.ref_value)
     def __rfloordiv__(self, value:NumberLike):
-        return value // self.ref_value
+        return np.floor_divide(value, self.ref_value)
     def __rmod__(self, value:NumberLike):
-        return value % self.ref_value
+        return np.mod(value, self.ref_value)
     def __rpow__(self, value:NumberLike):
-        return value ** self.ref_value
+        return np.pow(value, self.ref_value)
     def __neg__(self):
-        return -self.ref_value
+        return np.negative(self.ref_value)
     def __pos__(self):
-        return self.ref_value
+        return np.positive(self.ref_value)
     def __abs__(self):
-        return abs(self.ref_value)
+        return np.abs(self.ref_value)
     def __round__(self, ndigits:Optional[int]=None):
-        return round(self.ref_value, ndigits)
+        return np.round(self.ref_value, ndigits)
     def __eq__(self, value:NumberLike):
-        return self.ref_value == value
+        return np.equal(self.ref_value, value)
     def __ne__(self, value:NumberLike):
-        return self.ref_value != value
+        return self.__eq__(value) is False
     def __lt__(self, value:NumberLike):
         return self.ref_value < value
     def __le__(self, value:NumberLike):
@@ -79,13 +102,48 @@ class left_number_reference(left_value_reference[NumberLike]):
     def __ge__(self, value:NumberLike):
         return self.ref_value >= value
     def __bool__(self):
-        return bool(self.ref_value)
+        if self.is_empty():
+            return False
+        return self.ref_value != 0
     def __hash__(self):
         return hash(self.ref_value)
     def __repr__(self):
-        return str(self.ref_value)
+        if self.is_empty():
+            return "None"
+        return repr(self.ref_value)
     def __str__(self):
         return str(self.ref_value)
+    def __neg__(self):
+        return np.negative(self.ref_value)
+    def bitwise_and(self, value:NumberLike):
+        return np.bitwise_and(self.ref_value, value)
+    def bitwise_or(self, value:NumberLike):
+        return np.bitwise_or(self.ref_value, value)
+    def bitwise_xor(self, value:NumberLike):
+        return np.bitwise_xor(self.ref_value, value)
+    def bitwise_not(self):
+        return np.bitwise_not(self.ref_value)
+def Wrapper2Lvn(value:Union[
+    NumberLike,
+    left_number_reference,
+    left_value_reference[NumberLike],
+    right_value_refenence[NumberLike]
+    ]) -> left_number_reference:
+    if isinstance(value, NumberLike):
+        return left_number_reference(value)
+    else:
+        return left_number_reference(value.ref_value)
+def UnwrapperLvn(value:left_number_reference):
+    return value.ref_value
+class left_np_ndarray_reference(left_number_reference):
+    '''
+    针对np.ndarray的特化引用:
+        将np.ndarray操作封装为面向对象的形式
+    '''
+    def __init__(self, ref_value:Optional[np.ndarray]=None):
+        super().__init__(ref_value)
+    def where(self, pr:NumberLike):
+        return np.where(pr(self.ref_value))
 
 
 NumberInstanceOrContainer = Union[

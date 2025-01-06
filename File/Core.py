@@ -50,6 +50,7 @@ class tool_file(any_class):
 
     def __init__(self, file_path:str, file_mode:str=None, *args, **kwargs):
         self.__file_path:   str             = file_path
+        self.data:          Any             = None
         self.datas:         Dict[str, Any]  = {}
         self.__file:        IO[Any]         = None
         if file_mode is not None:
@@ -143,7 +144,10 @@ class tool_file(any_class):
         return self
     def open(self, mode='r', is_refresh=False, encoding:str='utf-8', *args, **kwargs):
         self.close()
-        self.__file = open(self.__file_path, mode, encoding=encoding, *args, **kwargs)
+        if 'b' in mode:
+            self.__file = open(self.__file_path, mode, *args, **kwargs)
+        else:
+            self.__file = open(self.__file_path, mode, encoding=encoding, *args, **kwargs)
         if is_refresh:
             self.refresh()
         return self.__file
@@ -329,6 +333,8 @@ class tool_file(any_class):
             raise Exception("Cannot get extension without target path")
         return get_extension_name(path)
     def get_path(self):
+        return self.get_full_path()
+    def get_full_path(self):
         return self.__file_path
     def get_filename(self, is_without_extension = False):
         '''

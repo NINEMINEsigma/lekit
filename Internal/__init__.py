@@ -55,8 +55,10 @@ class type_class(ABC):
         return str(self.GetType())
 class base_value_reference[_T](type_class):
     def __init__(self, ref_value:_T):
-        self._ref_value = ref_value
-        self.__real_type = type(ref_value)
+        self._reinit_ref_value(ref_value)
+    def _reinit_ref_value(self, value):
+        self._ref_value = value
+        self.__real_type = type(value)
     def _clear_ref_value(self):
         self._ref_value = None
     @override
@@ -65,21 +67,21 @@ class base_value_reference[_T](type_class):
     @override
     def SymbolName(self) -> str:
         if self._ref_value is None:
-            return "null"
+            return "None"
         return f"{self.GetType().__name__}&"
     @override
     def ToString(self) -> str:
         if self._ref_value is None:
-            return "null"
+            return "None"
         return str(self._ref_value)
 
     def __repr__(self):
         if self._ref_value is None:
-            return "null"
-        return self._ref_value.__repr__()
+            return "None"
+        return repr(self._ref_value)
     def __str__(self):
         if self._ref_value is None:
-            return "null"
+            return "None"
         return str(self._ref_value)
 class left_value_reference[_T](base_value_reference):
     def __init__(self, ref_value:_T):
@@ -91,6 +93,8 @@ class left_value_reference[_T](base_value_reference):
     def ref_value(self, value) -> _T:
         if value is None or isinstance(value, self.GetType()):
             self._ref_value = value
+        elif self.GetType() == type(None):
+            self._reinit_ref_value(value)
         else:
             raise TypeError(f"Cannot assign {type(value)} to {self.GetType()}")
         return value
@@ -248,6 +252,11 @@ class iter_callable_range(Callable[[], bool], any_class):
         result = start<stop
         self.start = start + self.step
         return result
+
+# using as c#: func(out var obj)
+class out_value_reference[_T](left_value_reference[_T]):
+    def __init__(self, value:Optional[_T] = None):
+        super().__init__(value)
 
 # region instance
 
