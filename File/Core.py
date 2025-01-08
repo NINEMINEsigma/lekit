@@ -62,6 +62,8 @@ class tool_file(any_class):
     def __setitem__(self, key:str, value):
         self.datas[key] = value
     def __getitem__(self, key:str):
+        if key not in self.datas:
+            self.datas[key] = None
         return self.datas[key]
     def __contains__(self, key:str):
         return key in self.datas
@@ -71,6 +73,16 @@ class tool_file(any_class):
         return iter(self.datas)
     def __len__(self):
         return len(self.datas)
+    @override
+    def __enter__(self):
+        if self.is_open():
+            return self
+        self.load()
+        return self
+    @override
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return True
 
     def __or__(self, other):
         if other is None:
@@ -186,39 +198,46 @@ class tool_file(any_class):
             self.load_as_docx()
         elif suffix in audio_file_type:
             self.load_as_audio()
-        elif is_binary_file(self.__file_path):
-            self.load_as_binary()
         elif is_image_file(self.__file_path):
             self.load_as_image()
+        elif is_binary_file(self.__file_path):
+            self.load_as_binary()
         else:
             self.load_as_unknown(suffix)
         return self.data
     def load_as_json(self) -> pd.DataFrame:
-        self.open('r')
+        if self.is_open() is False or 'w' in self.__file.mode:
+            self.open('r')
         self.data = json.load(self.__file)
         return self.data
     def load_as_csv(self) -> pd.DataFrame:
-        self.open('r')
+        if self.is_open() is False or 'w' in self.__file.mode:
+            self.open('r')
         self.data = pd.read_csv(self.__file)
         return self.data
     def load_as_xml(self) -> pd.DataFrame:
-        self.open('r')
+        if self.is_open() is False or 'w' in self.__file.mode:
+            self.open('r')
         self.data = pd.read_xml(self.__file)
         return self.data
     def load_as_dataframe(self) -> pd.DataFrame:
-        self.open('r')
+        if self.is_open() is False or 'w' in self.__file.mode:
+            self.open('r')
         self.data = pd.read_csv(self.__file)
         return self.data
     def load_as_excel(self) -> pd.DataFrame:
-        self.open('r')
+        if self.is_open() is False or 'w' in self.__file.mode:
+            self.open('r')
         self.data = pd.read_excel(self.__file)
         return self.data
     def load_as_binary(self) -> bytes:
-        self.open('rb')
+        if self.is_open() is False or 'w' in self.__file.mode:
+            self.open('rb')
         self.data = self.__file.read()
         return self.data
     def load_as_text(self) -> str:
-        self.open('r')
+        if self.is_open() is False or 'w' in self.__file.mode:
+            self.open('r')
         self.data = list_byte_to_string(self.__file.readlines())
         return self.data
     def load_as_wav(self):
@@ -265,54 +284,63 @@ class tool_file(any_class):
         else:
             self.save_as_unknown(path)
         return self
-    def save_as_json(self, path:str):
-        path = path if path else self.__file_path
-        json.dump(self.data, self.__file, indent=4)
+    def save_as_json(self, path:Optional[str]=None):
+        path = path if path is not None else self.__file_path
+        self.close()
+        with open('w', encoding='utf-8') as f:
+            json.dump(self.data, f, indent=4)
         return self
-    def save_as_csv(self, path:str):
-        path = path if path else self.__file_path
+    def save_as_csv(self, path:Optional[str]=None):
+        path = path if path is not None else self.__file_path
         self.data.to_csv(path)
         return self
-    def save_as_xml(self, path:str):
-        path = path if path else self.__file_path
+    def save_as_xml(self, path:Optional[str]=None):
+        path = path if path is not None else self.__file_path
         self.data.to_xml(path)
         return self
-    def save_as_dataframe(self, path:str):
-        path = path if path else self.__file_path
+    def save_as_dataframe(self, path:Optional[str]=None):
+        path = path if path is not None else self.__file_path
         self.data.to_csv(path)
         return self
-    def save_as_excel(self, path:str):
-        path = path if path else self.__file_path
+    def save_as_excel(self, path:Optional[str]=None):
+        path = path if path is not None else self.__file_path
         self.data.to_excel(path, index=False)
         return self
-    def save_as_binary(self, path:str):
+    def save_as_binary(self, path:Optional[str]=None):
         if path is not None:
             with open(path, 'wb') as f:
                 f.write(self.data)
         else:
+            if self.is_open() is False or 'r' in self.__file.mode:
+                self.open('wb')
             self.__file.write(self.data)
         return self
-    def save_as_text(self, path:str):
+    def save_as_text(self, path:Optional[str]=None):
         if path is not None:
             with open(path, 'w') as f:
                 f.writelines(self.data)
         else:
+            if self.is_open() is False or 'r' in self.__file.mode:
+                self.open('w')
             self.__file.writelines(self.data)
         return self
-    def save_as_audio(self, path:str):
-        self.data.export(path if path else self.__file_path, format=self.get_extension(path))
+    def save_as_audio(self, path:Optional[str]=None):
+        path = path if path is not None else self.__file_path
+        self.data.export(path, format=self.get_extension(path))
         return self
-    def save_as_image(self, path:str):
-        self.data.save(path if path else self.__file_path)
+    def save_as_image(self, path:Optional[str]=None):
+        path = path if path is not None else self.__file_path
+        self.data.save(path)
         return self
-    def save_as_docx(self, path:str):
+    def save_as_docx(self, path:Optional[str]=None):
         if self.data is str:
             self.data = Document()
             table = self.data.add_table(rows=1, cols=1)
             table.cell(0, 0).text = self.data
-        self.data.save(path if path else self.__file_path)
+        path = path if path is not None else self.__file_path
+        self.data.save(path)
         return self
-    def save_as_unknown(self, path:str):
+    def save_as_unknown(self, path:Optional[str]=None):
         self.save_as_text(path)
 
     def get_size(self) -> int:
@@ -500,6 +528,152 @@ class tool_file(any_class):
     @override
     def ToString(self):
         return self.get_path()
+
+class loss_file(tool_file):
+    def __init__(self, file_path:str, *args, **kwargs):
+        super().__init__(file_path, *args, **kwargs)
+
+    @override
+    def __setitem__(self, key:str, value):
+        raise ValueError("loss file cannt set item in its data-items")
+    @override
+    def __getitem__(self, key:str):
+        return None
+    def __contains__(self, key:str):
+        return False
+    def __delitem__(self, key:str):
+        pass
+    def __iter__(self):
+        return iter({})
+    def __len__(self):
+        return -1
+    @override
+    def __enter__(self):
+        return self
+    @override
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return True
+
+    @override
+    def __or__(self, other):
+        return loss_file(super().__or__(other).get_path())
+
+    @override
+    def create(self) -> tool_file:
+        return self
+    @override
+    def exists(self) -> bool:
+        return False
+    @override
+    def remove(self) -> tool_file:
+        return self
+    @override
+    def copy(self, to_path:Union[Self, str]) -> tool_file:
+        return None
+    @override
+    def move(self, to_path:Union[Self, str]) -> tool_file:
+        return self
+    @override
+    def rename(self, newpath:Union[Self, str]) -> tool_file:
+        return self
+
+    override
+    def refresh(self) -> tool_file:
+        return self
+    @override
+    def open(self, *args, **kwargs) -> IO[Any]:
+        return None
+    @override
+    def close(self) -> IO[Any]:
+        return None
+    @override
+    def is_open(self)->bool:
+        return False
+
+    @override
+    def load(self):
+        return None
+    @override
+    def load_as_json(self) -> pd.DataFrame:
+        return None
+    @override
+    def load_as_csv(self) -> pd.DataFrame:
+        return None
+    @override
+    def load_as_xml(self) -> pd.DataFrame:
+        return None
+    @override
+    def load_as_dataframe(self) -> pd.DataFrame:
+        return None
+    @override
+    def load_as_excel(self) -> pd.DataFrame:
+        return None
+    @override
+    def load_as_binary(self) -> bytes:
+        return None
+    @override
+    def load_as_text(self) -> str:
+        return None
+    @override
+    def load_as_wav(self):
+        return None
+    @override
+    def load_as_audio(self):
+        return None
+    @override
+    def load_as_image(self) -> ImageFile.ImageFile:
+        return None
+    @override
+    def load_as_docx(self) -> DocumentObject:
+        return None
+    @override
+    def load_as_unknown(self, suffix:str) -> Any:
+        return None
+
+    @override
+    def save(self, path:str=None):
+        return self
+    @override
+    def save_as_json(self, path:str):
+        return self
+    @override
+    def save_as_csv(self, path:str):
+        return self
+    @override
+    def save_as_xml(self, path:str):
+        return self
+    @override
+    def save_as_dataframe(self, path:str):
+        return self
+    @override
+    def save_as_excel(self, path:str):
+        return self
+    @override
+    def save_as_binary(self, path:str):
+        return self
+    @override
+    def save_as_text(self, path:str):
+        return self
+    @override
+    def save_as_audio(self, path:str):
+        return self
+    @override
+    def save_as_image(self, path:str):
+        return self
+    @override
+    def save_as_docx(self, path:str):
+        return Self
+    @override
+    def save_as_unknown(self, path:str):
+        return Self
+
+
+    @override
+    def SymbolName(self):
+        return f"LossFile<{self.get_path()}>"
+
+static_loss_file_dir = loss_file(".temp/")
+static_loss_file = loss_file(".temp.bad")
 
 def Wrapper(file) -> tool_file:
     if isinstance(file, tool_file):

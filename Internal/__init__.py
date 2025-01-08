@@ -30,13 +30,15 @@ def InternalImportingThrow(
         requierds_str = ",".join([f"<{r}>" for r in requierds])
         print(f"Internal lekit package is not installed.\n{messageBase.format_map(dict(module=moduleName, required=requierds_str))}")
 
-def static_cast[_T](from_) -> _T:
-    return _T(from_)
-def dynamic_cast[_T](from_) -> Optional[_T]:
-    if isinstance(from_, _T):
+type Typen[_T] = type
+
+def static_cast[_T](typen:Typen[_T], from_) -> _T:
+    return typen(from_)
+def dynamic_cast[_T](typen:Typen[_T], from_) -> Optional[_T]:
+    if isinstance(from_, typen):
         return from_
     return None
-def reinterpret_cast[_T](from_) -> _T:
+def reinterpret_cast[_T](typen:Typen[_T], from_) -> _T:
     raise NotImplementedError("Python does not support reinterpret_cast anyways")
 
 type Action[_T] = Callable[[_T], None]
@@ -53,6 +55,33 @@ class type_class(ABC):
         return self.GetType().__name__
     def ToString(self) -> str:
         return str(self.GetType())
+    def AsRef[_T](self, typen:Typen[_T]) -> _T:
+        return dynamic_cast(self, typen)
+    def AsValue[_T](self, typen:Typen[_T]) -> _T:
+        '''
+        warning: this will be a real transform, it is not a reference to the object
+        '''
+        return static_cast[_T](self, typen)
+    def Fetch[_T](self, value:_T) -> _T:
+        return value
+    def Is[_T](self, typen:Typen[_T]) -> bool:
+        return isinstance(self, typen)
+    def IfIam[_T](self, typen:Typen[_T], action:Action[_T]) -> Self:
+        if self.Is(typen):
+            action(self)
+        return self
+    def AsIam[_T](self, typen:Typen[_T], action:Action[_T]) -> Self:
+        action(self.AsRef(typen))
+        return self
+    def __enter__(self) -> Self:
+        return self
+    def __exit__(
+        self,
+        exc_type:   Optional[type],
+        exc_val:    Optional[BaseException],
+        exc_tb:     Optional[TracebackType]
+        ) -> Optional[bool]:
+        return True
 class base_value_reference[_T](type_class):
     def __init__(self, ref_value:_T):
         self._reinit_ref_value(ref_value)
@@ -114,59 +143,25 @@ class right_value_refenence[_T](type_class):
     def const_ref_value(self) -> _T:
         return self.__ref_value
 class any_class(type_class, ABC):
-    def AsRef[_T](self):
-        return dynamic_cast[_T](self)
-    def AsValue[_T](self):
-        '''
-        warning: this will be a real transform, it is not a reference to the object
-        '''
-        return static_cast[_T](self)
-    def Fetch[_T](self, value:_T) -> _T:
-        return value
     def Share[_T](self, out_value:left_value_reference[_T]) -> Self:
         if out_value is None:
             raise ValueError("out_value cannot be None")
-        out_value.ref_value = self.AsRef[_T]()
+        out_value.ref_value = self
         return self
-    def Is[_T](self) -> bool:
-        return isinstance(self, _T)
-    def IfIam[_T, _Ret](self, action:Callable[[_T], _Ret]) -> Union[Self, _Ret]:
-        if self.Is[_T]() is False:
-            return self
-        if _Ret == type(None):
-            return action(self)
-        else:
-            action(self)
-        return self
-    def AsIam[_T, _Ret](self, action:Callable[[_T], _Ret]) -> Union[Self, _Ret]:
-        if _Ret == type(None):
-            action(self.AsRef[_T]())
-            return self
-        return action(self.AsRef[_T]())
-    def __enter__(self) -> Self:
-        return self
-    def __exit__(
-        self,
-        exc_type:   Optional[type],
-        exc_val:    Optional[BaseException],
-        exc_tb:     Optional[TracebackType]
-        ) -> Optional[bool]:
-        return True
 
 class null_package[_T](left_value_reference[_T]):
     @override
     def __init__(self, ref_value:_T):
         super().__init__(ref_value)
 
-    def Try[_Ret](
+    def Try[_T](
         self,
-        call:Union[Callable[[_T], _Ret]]
-        ) -> Union[Self, _Ret]:
-        if _Ret == type(None):
+        typen:Typen[_T],
+        call:Action[_T]
+        ) -> Self:
+        if self.GetType() == typen:
             call(self.ref_value)
-            return self
-        else:
-            return call(self.ref_value)
+        return self
 class closures[_T](left_value_reference[_T]):
     @override
     def __init__(self, ref_value:_T, callback:Action[_T]):

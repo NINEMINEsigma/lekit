@@ -9,7 +9,7 @@ from PIL                import ImageFile, Image
 
 from lekit.MathEx.Core  import *
 from lekit.Str.Core     import UnWrapper as Unwrapper2Str
-from lekit.File.Core    import tool_file, Wrapper as Wrapper2File, tool_file_or_str
+from lekit.File.Core    import tool_file, Wrapper as Wrapper2File, tool_file_or_str, loss_file
 
 # OpenCV Image format is BGR
 # PIL Image format is RBG
@@ -44,6 +44,8 @@ class VideoWriterInstance(VideoWriter, any_class):
         frame_size: tuple[int, int],
         is_color:   bool = True
         ):
+        if isinstance(file_name, loss_file):
+            raise ValueError(f"file_name<{file_name.SymbolName()}> is not a valid file")
         super().__init__(Unwrapper2Str(file_name), fourcc, fps, frame_size, is_color)
     def __del__(self):
         self.release()
@@ -81,6 +83,8 @@ class light_cv_view(any_class):
         self.release()
         if isinstance(filename_or_index, int):
             self.__capture = base.VideoCapture(filename_or_index)
+        elif isinstance(filename_or_index, loss_file):
+            raise ValueError(f"filename_or_index<{filename_or_index.SymbolName()}> is not a valid file")
         else:
             self.__capture = base.VideoCapture(Unwrapper2Str(filename_or_index))
         return self
@@ -213,21 +217,32 @@ class light_cv_camera(light_cv_view, any_class):
     def recording(
         self,
         stop_pr:    Callable[[], bool],
-        writer:     VideoWriter,
+        writer:     Union[VideoWriter, Callable[[MatLike], Any]],
         ):
-        self.writer = writer
+        writer_stats = False
+        if isinstance(writer, VideoWriter):
+            self.writer = writer
+            writer_stats = True
         while self.is_open():
             if stop_pr():
                 break
             frame = self.current_frame()
             base.imshow("__recording__", frame)
-            writer.write(frame)
+            if writer_stats:
+                writer.write(frame)
+            else:
+                writer(frame)
         base.destroyWindow("__recording__")
         return self
 
     @override
     def ToString(self):
         return f"Camera<{self.width}x{self.height}>"
+
+def get_zero_mask(shape, *args, **kwargs) -> MatLike:
+    return np.zeros(shape, *args, **kwargs)
+def get_one_mask(shape, value, *args, **kwargs) -> MatLike:
+    return np.ones(shape, value, *args, **kwargs)
 
 class ImageObject(left_np_ndarray_reference):
     @property
@@ -254,6 +269,7 @@ class ImageObject(left_np_ndarray_reference):
         super().__init__()
         self.__camera:  light_cv_camera = None
         self.current:   MatLike         = None
+        self.__gray:    MatLike         = None
         if isinstance(image, light_cv_camera):
             self.lock_from_camera(image)
         else:
@@ -308,7 +324,8 @@ class ImageObject(left_np_ndarray_reference):
         code:   int = base.COLOR_RGB2BGR,
         *args, **kwargs
         ):
-        self.__image = base.cvtColor(array_, code, *args, **kwargs)
+        self.__gray = None
+        self.__image = base.cvtColor(array_, code, *args, **kwargs).astype(np.uint8)
         return self
     def load_from_PIL_image(
         self,
@@ -325,6 +342,7 @@ class ImageObject(left_np_ndarray_reference):
     ):
         return self.load_from_PIL_image(image.crop(rect))
     def load_from_cv2_image(self, image:  MatLike):
+        self.__gray = None
         self.__image = image
         return self
     def lock_from_camera(self, camera: light_cv_camera):
@@ -382,11 +400,15 @@ class ImageObject(left_np_ndarray_reference):
             self.load_from_PIL_ImageFile(image, flags)
         elif isinstance(image, Image.Image):
             self.load_from_PIL_image(image, flags)
+        elif isinstance(image, loss_file):
+            self.__image = None
         else:
             self.__image = base.imread(Unwrapper2Str(image), flags)
         return self
     def save_image(self, save_path:Union[str, tool_file], is_path_must_exist = False):
         """保存图片"""
+        if isinstance(save_path, loss_file):
+            return self
         if is_path_must_exist:
             Wrapper2File(save_path).try_create_parent_path()
         if self.is_enable():
@@ -419,6 +441,60 @@ class ImageObject(left_np_ndarray_reference):
         if base.getWindowProperty(window_name, base.WND_PROP_VISIBLE) > 0:
             base.destroyWindow(window_name)
         return self
+
+    # 绝对值转换
+    def convert_scale_abs(self):
+        """绝对值转换"""
+        return ImageObject(base.convertScaleAbs(self.image))
+
+    # 图像边缘检测
+    def edge_detect_with_sobel(
+        self,
+        *,
+        ksize:      Optional[int]   = None,
+        scale:      Optional[float] = None,
+        delta:      Optional[float] = None,
+        borderType: Optional[int]   = None,
+        **kwargs
+        ):
+        if ksize is not None:
+            kwargs["ksize"] = ksize
+        if scale is not None:
+            kwargs["scale"] = scale
+        if delta is not None:
+            kwargs["delta"] = delta
+        if borderType is not None:
+            kwargs["borderType"] = borderType
+        gray = self.get_grayscale()
+        dx = base.Sobel(gray, base.CV_16S, 1, 0, **kwargs)
+        dy = base.Sobel(gray, base.CV_16S, 0, 1, **kwargs)
+        return ImageObject(dx).convert_scale_abs().merge_with_blending(
+                ImageObject(dy).convert_scale_abs(), (0.5, 0.5))
+    def edge_detect_with_roberts(self):
+        kernelx = np.array([[-1,0],[0,1]], dtype=int)
+        kernely = np.array([[0,-1],[1,0]], dtype=int)
+        gray = self.get_grayscale()
+        dx = base.filter2D(gray, base.CV_16S, kernelx)
+        dy = base.filter2D(gray, base.CV_16S, kernely)
+        return ImageObject(dx).convert_scale_abs().merge_with_blending(
+                ImageObject(dy).convert_scale_abs(), (0.5, 0.5))
+    def edge_detect_with_laplacian(
+        self,
+        kernalSize: int = 3
+        ):
+        gray = self.get_grayscale()
+        return ImageObject(base.convertScaleAbs(
+            base.Laplacian(gray, base.CV_16S, ksize=kernalSize)
+            ))
+    def edge_detect_with_canny(
+        self,
+        threshold1: float,
+        threshold2: float,
+        **kwargs
+        ):
+        return ImageObject(base.Canny(
+            self.get_grayscale(), threshold1, threshold2, **kwargs
+            ))
 
     # 分离通道
     def split(self):
@@ -466,7 +542,7 @@ class ImageObject(left_np_ndarray_reference):
     # Transform
     def get_resize_image(self, width:int, height:int):
         if self.is_enable():
-            return base.resize(self.image, (width, height))
+            return ImageObject(base.resize(self.image, (width, height)))
         return None
     def get_rotate_image(self, angle:float):
         if self.is_invalid():
@@ -474,18 +550,18 @@ class ImageObject(left_np_ndarray_reference):
         (h, w) = self.image.shape[:2]
         center = (w // 2, h // 2)
         M = base.getRotationMatrix2D(center, angle, 1.0)
-        return base.warpAffine(self.image, M, (w, h))
+        return ImageObject(base.warpAffine(self.image, M, (w, h)))
     def resize_image(self, width:int, height:int):
         """调整图片大小"""
         new_image = self.get_resize_image(width, height)
         if new_image is not None:
-            self.image = new_image
+            self.image = new_image.image
         return self
     def rotate_image(self, angle:float):
         """旋转图片"""
         new_image = self.get_rotate_image(angle)
         if new_image is not None:
-            self.image = new_image
+            self.image = new_image.image
         return self
 
     # 图片翻折
@@ -505,7 +581,7 @@ class ImageObject(left_np_ndarray_reference):
         return self.flip(-1)
 
     # 色彩空间猜测
-    def guess_color_space(self) -> Optional[str]:
+    def guess_color_space(self) -> str:
         """猜测色彩空间"""
         if self.is_invalid():
             return None
@@ -536,22 +612,25 @@ class ImageObject(left_np_ndarray_reference):
         """颜色转化"""
         if self.is_invalid():
             return None
-        return base.cvtColor(self.image, color_convert)
+        return ImageObject(base.cvtColor(self.image, color_convert))
     def convert_to(self, color_convert:int):
         """颜色转化"""
         if self.is_invalid():
             return None
         self.image = self.get_convert(color_convert)
+        return self
 
     def is_grayscale(self):
         return self.dimension == 2
-    def get_grayscale(self):
+    def get_grayscale(self, curColor=base.COLOR_BGR2GRAY) -> MatLike:
         if self.is_invalid():
             return None
-        return base.cvtColor(self.image, base.COLOR_BGR2GRAY)
+        if self.__gray is None and self.camera is None:
+            self.__gray = base.cvtColor(self.image, curColor)
+        return self.__gray
     def convert_to_grayscale(self):
         """将图片转换为灰度图"""
-        self.image = self.get_grayscale()
+        self.__image = self.get_grayscale()
         return self
 
     def get_convert_flag(
@@ -666,18 +745,245 @@ class ImageObject(left_np_ndarray_reference):
     def merge_with_mask(self, other:Self, mask:Self):
         return ImageObject(base.bitwise_and(self.image, other.image, mask.image))
 
+    # 滤波
+    def filter(self, ddepth:int, kernel:MatLike, *args, **kwargs):
+        return base.filter2D(self.image, ddepth, kernel, *args, **kwargs)
+    def filter_blur(self, kernalSize:Tuple[float, float]):
+        return base.blur(self.image, kernalSize)
+    def filter_gaussian(self, kernalSize:Tuple[float, float], sigmaX:float, sigmaY:float):
+        return base.GaussianBlur(self.image, kernalSize, sigmaX, sigmaY)
+    def filter_median(self, kernalSize:int):
+        return base.medianBlur(self.image, kernalSize)
+    def filter_bilateral(self, d:float, sigmaColor:float, sigmaSpace:float):
+        return base.bilateralFilter(self.image, d, sigmaColor, sigmaSpace)
+    def filter_sobel(self, dx:int, dy:int, kernalSize:int):
+        return base.Sobel(self.image, -1, dx, dy, ksize=kernalSize)
+    def filter_canny(self, threshold1:float, threshold2:float):
+        return base.Canny(self.image, threshold1, threshold2)
+    def filter_laplacian(self, kernalSize:int):
+        return base.Laplacian(self.image, -1, ksize=kernalSize)
+    def filter_scharr(self, dx:int, dy:int):
+        return base.Scharr(self.image, -1, dx, dy)
+    def filter_box_blur(self, kernalSize:Tuple[float, float]):
+        return base.boxFilter(self.image, -1, ksize=kernalSize, normalize=0)
+
     # 阈值
-    def clamp(self, mini:Any, maxi:Optional[Any]=None):
-        cur_mini = None
-        cur_maxi = None
-        if maxi is None:
-            cur_mini, cur_maxi = 0, mini
+    def threshold(
+        self,
+        threshold:float,
+        type:int
+        ):
+        return base.threshold(self.image, threshold, 255, type)
+    def adaptiveThreshold(
+        self,
+        adaptiveMethod: int = base.ADAPTIVE_THRESH_MEAN_C,
+        thresholdType:  int = base.THRESH_BINARY,
+        blockSize:      int = 11,
+        C:            float = 2,
+        ):
+        return base.adaptiveThreshold(self.image, 255, adaptiveMethod, thresholdType, blockSize, C)
+    # 获取二值化
+    def Separate2EnableScene(self,*, is_front=True, is_back=False):
+        '''
+        return mask -> front, back
+        '''
+        if is_back == is_front:
+            is_back = not is_front
+        gray = self.get_grayscale()
+        if is_front:
+            return base.threshold(gray, 255.0/2.0, 255, base.THRESH_BINARY)
         else:
-            cur_mini, cur_maxi = mini, maxi
-        mini_mask = np.where(self.image < cur_mini)
-        maxi_mask = np.where(self.image > cur_maxi)
-        self.image[mini_mask] = cur_mini
-        self.image[maxi_mask] = cur_maxi
+            return base.threshold(gray, 255.0/2.0, 255, base.THRESH_BINARY_INV)
+    def Separate2EnableScenes_with_Otsu(self,*, is_front=True, is_back=False):
+        '''
+        return mask -> front, back
+        '''
+        if is_back == is_front:
+            is_back = not is_front
+        gray = self.get_grayscale()
+        if is_front:
+            return base.threshold(gray, 0, 255, base.THRESH_BINARY | base.THRESH_OTSU)
+        else:
+            return base.threshold(gray, 0, 255, base.THRESH_BINARY_INV | base.THRESH_OTSU)
+    # 获取二值化遮罩
+    def SeparateFrontBackScenes(self):
+        '''
+        return mask -> front, back
+        '''
+        gray = self.get_grayscale()
+        _, front = base.threshold(gray, 255.0/2.0, 255, base.THRESH_BINARY)
+        _, back = base.threshold(gray, 255.0/2.0, 255, base.THRESH_BINARY_INV)
+        return np.where(gray>=front), np.where(gray>=back)
+    def SeparateFrontBackScenes_with_Otsu(self):
+        '''
+        return mask -> front, back
+        '''
+        gray = self.get_grayscale()
+        _, front = base.threshold(gray, 0, 255, base.THRESH_BINARY | base.THRESH_OTSU)
+        _, back = base.threshold(gray, 0, 255, base.THRESH_BINARY_INV | base.THRESH_OTSU)
+        return np.where(gray>=front), np.where(gray>=back)
+    # 获取核
+    def get_kernel(self, shape:int, kernalSize:Tuple[float, float]):
+        return base.getStructuringElement(shape, kernalSize)
+    def get_rect_kernal(self, kernalSize:Tuple[float, float]):
+        return self.get_kernel(base.MORPH_RECT, kernalSize)
+    def get_cross_kernal(self, kernalSize:Tuple[float, float]):
+        return self.get_kernel(base.MORPH_CROSS, kernalSize)
+    def get_ellipse_kernal(self, kernalSize:Tuple[float, float]):
+        return self.get_kernel(base.MORPH_ELLIPSE, kernalSize)
+    # 膨胀
+    def dilate(self, kernel:Optional[MatLike]=None, *args, **kwargs):
+        if kernel is None:
+            kernel = self.get_rect_kernal((3, 3))
+        return base.dilate(self.image, kernel, *args, **kwargs)
+    # 腐蚀
+    def erode(self, kernel:Optional[MatLike]=None, *args, **kwargs):
+        if kernel is None:
+            kernel = self.get_rect_kernal((3, 3))
+        return base.erode(self.image, kernel, *args, **kwargs)
+    # 开运算
+    def open_operator(self, kernel:Optional[MatLike]=None, *args, **kwargs):
+        if kernel is None:
+            kernel = self.get_rect_kernal((3, 3))
+        return base.morphologyEx(self.image, base.MORPH_OPEN, kernel, *args, **kwargs)
+    # 闭运算
+    def close_operator(self, kernel:Optional[MatLike]=None, *args, **kwargs):
+        if kernel is None:
+            kernel = self.get_rect_kernal((3, 3))
+        return base.morphologyEx(self.image, base.MORPH_CLOSE, kernel, *args, **kwargs)
+    # 梯度运算
+    def gradient_operator(self, kernel:Optional[MatLike]=None, *args, **kwargs):
+        if kernel is None:
+            kernel = self.get_rect_kernal((3, 3))
+        return base.morphologyEx(self.image, base.MORPH_GRADIENT, kernel, *args, **kwargs)
+    # 顶帽运算
+    def tophat_operator(self, kernel:Optional[MatLike]=None, *args, **kwargs):
+        if kernel is None:
+            kernel = self.get_rect_kernal((3, 3))
+        return base.morphologyEx(self.image, base.MORPH_TOPHAT, kernel, *args, **kwargs)
+    # 黑帽运算
+    def blackhat_operator(self, kernel:Optional[MatLike]=None, *args, **kwargs):
+        if kernel is None:
+            kernel = self.get_rect_kernal((3, 3))
+        return base.morphologyEx(self.image, base.MORPH_BLACKHAT, kernel, *args, **kwargs)
+
+
+    # 绘制轮廓
+    def drawContours(
+        self,
+        contours:   Sequence[MatLike],
+        contourIdx: int                         = -1,
+        color:      Union[MatLike, Tuple[int]]  = (0, 0, 0),
+        thickness:  int                         = 1,
+        lineType:   int                         = base.LINE_8,
+        hierarchy:  Optional[MatLike]           = None,
+        maxLevel:   int                         = base.FILLED,
+        offset:     Optional[Point]             = None,
+        is_draw_on_self:bool                    = False
+        ) -> MatLike:
+        image = self.image if is_draw_on_self else self.image.copy()
+        return base.drawContours(image, contours, contourIdx, color, thickness, lineType, hierarchy, maxLevel, offset)
+    # 修改自身的绘制
+    def draw_rect(
+        self,
+        rect:       Rect,
+        color:      Union[MatLike, Tuple[int]]  = (0, 0, 0),
+        thickness:  int                         = 1,
+        lineType:   int                         = base.LINE_8,
+        ) -> MatLike:
+        base.rectangle(self.image, rect, color, thickness, lineType)
+        return self
+    # 获取轮廓
+    def get_contours(
+        self,
+        *,
+        mode:       int                         = base.RETR_LIST,
+        method:     int                         = base.CHAIN_APPROX_SIMPLE,
+        is_front:   bool                        = True,
+        contours:   Optional[Sequence[MatLike]] = None,
+        hierarchy:  Optional[MatLike]           = None,
+        offset:     Optional[Point]             = None
+        ) -> Tuple[Sequence[MatLike], MatLike]:
+        _, bin = self.Separate2EnableScene(is_front=is_front)
+        if offset is not None:
+            return base.findContours(bin, mode, method, contours, hierarchy, offset)
+        else:
+            return base.findContours(bin, mode, method, contours, hierarchy)
+    def get_contours_mask(
+        self,
+        width:      int,
+        *,
+        mode:       int                         = base.RETR_LIST,
+        method:     int                         = base.CHAIN_APPROX_SIMPLE,
+        is_front:   bool                        = True,
+        contours:   Optional[Sequence[MatLike]] = None,
+        hierarchy:  Optional[MatLike]           = None,
+        offset:     Optional[Point]             = None,
+        ) -> Tuple[Sequence[MatLike], MatLike]:
+        find_contours, _ = self.get_contours(
+            mode=mode,
+            method=method,
+            is_front=is_front,
+            contours=contours,
+            hierarchy=hierarchy,
+            offset=offset
+            )
+        return base.drawContours(get_zero_mask(self.shape, dtype=np.uint8), find_contours, -1, (255, 255, 255), width)
+    def get_contours_fill_inside_mask(
+        self,
+        *,
+        mode:       int                         = base.RETR_LIST,
+        method:     int                         = base.CHAIN_APPROX_SIMPLE,
+        is_front:   bool                        = True,
+        contours:   Optional[Sequence[MatLike]] = None,
+        hierarchy:  Optional[MatLike]           = None,
+        offset:     Optional[Point]             = None
+        ) -> Tuple[Sequence[MatLike], MatLike]:
+        return self.get_contours_mask(
+            mode=mode,
+            method=method,
+            is_front=is_front,
+            contours=contours,
+            hierarchy=hierarchy,
+            offset=offset,
+            width=-1
+            )
+    # 获取轮廓方框
+    def get_xy_rect_from_contours(
+        self,
+        *,
+        mode:       int                         = base.RETR_LIST,
+        method:     int                         = base.CHAIN_APPROX_SIMPLE,
+        is_front:   bool                        = True,
+        contours:   Optional[Sequence[MatLike]] = None,
+        hierarchy:  Optional[MatLike]           = None,
+        offset:     Optional[Point]             = None
+        ) -> Sequence[Rect]:
+        return [base.boundingRect(contour) for contour in self.get_contours(
+            mode=mode,
+            method=method,
+            is_front=is_front,
+            contours=contours,
+            hierarchy=hierarchy,
+            offset=offset
+            )]
+    def get_minarea_rect_from_contours(
+        self,
+        *,
+        mode:       int                         = base.RETR_LIST,
+        method:     int                         = base.CHAIN_APPROX_SIMPLE,
+        is_front:   bool                        = True,
+        contours:   Optional[Sequence[MatLike]] = None,
+        hierarchy:  Optional[MatLike]           = None,
+        offset:     Optional[Point]             = None
+        ) -> Sequence[RotatedRect]:
+        return [base.minAreaRect(contour) for contour in self.get_contours(
+            mode=mode,
+            method=method,
+            is_front=is_front,
+            contours=contours,
+            hierarchy=hierarchy,
+            offset=offset)]
 
 def get_new_noise(
     raw_image:  Optional[MatLike],
@@ -853,11 +1159,11 @@ class tool_file_cvex(tool_file):
         super().__init__(file_path, *args, **kwargs)
 
     @override
-    def load(self) -> ImageObject:
+    def load_as_image(self) -> ImageObject:
         self.data = ImageObject(self)
         return self.data
     @override
-    def save(self, path = None):
+    def save_as_image(self, path = None):
         image:ImageObject   = self.data
         image.save_image(path if path is not None else self.get_path())
         return self
