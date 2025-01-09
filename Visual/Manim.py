@@ -147,21 +147,25 @@ class Animation(left_value_reference[Mobject]):
         self.cd_constructor:        CDstructorType              = constructor
         self.cd_destructor:         CDstructorType              = destructor
         self.__cd_stats:            bool                        = False
-    def inject_play_animation(self, scene:base.Scene):
+    def get_manim_animation(self,*, from_:Optional[Mobject]=None):
+        if from_ is not None:
+            return self.args_config.animate_creater(from_)
         if self.m_animation_instance is None:
             self.m_animation_instance = self.args_config.animate_creater(self.ref_value)
-        scene.play(self.m_animation_instance, **self.play_config)
-    def __catch_cd(self, scene):
+        return self.m_animation_instance
+    def inject_play_animation(self, scene:base.ThreeDScene):
+        scene.play(self.get_manim_animation(), **self.play_config)
+    def __catch_cd(self, scene:base.ThreeDScene):
         if self.__cd_stats is False:
             if self.cd_constructor is not None:
                 self.cd_constructor(self, scene)
             self.__cd_stats = True
-    def __release_cd(self, scene):
+    def __release_cd(self, scene:base.ThreeDScene):
         if self.__cd_stats is True:
             if self.cd_destructor is not None:
                 self.cd_destructor(self, scene)
             self.__cd_stats = False
-    def play_animation(self, scene:base.Scene):
+    def play_animation(self, scene:base.ThreeDScene):
         self.__catch_cd(scene)
         self.activate_scene = scene
         self.inject_play_animation(scene)
@@ -170,7 +174,7 @@ class Animation(left_value_reference[Mobject]):
             scene.wait_until(self.args_config.wait_until, self.args_config.delay_or_max_time)
         elif self.args_config.delay_or_max_time > 0:
             scene.wait(self.args_config.delay_or_max_time)
-    def release_play_animation(self, scene:base.Scene):
+    def release_play_animation(self, scene:base.ThreeDScene):
         self.__release_cd(scene)
     @property
     def cd_stats(self):
@@ -679,12 +683,13 @@ class NumberPlaneAnimationConfig:
         y_range:            Optional[Sequence[NumberLike]]  = None,
         x_length:           Optional[float]                 = None,
         y_length:           Optional[float]                 = None,
-        numberplaneType:    base.NumberPlane = base.NumberPlane,
+        numberplaneType:    Union[Callable, type]           = base.NumberPlane,
         # style
         background_line_style:  Optional[Dict[str, Any]]    = None,
         faded_line_style:       Optional[Dict[str, Any]]    = None,
-        faded_line_ratio:       int                         = 1,
-        make_smooth_after_applying_functions:          bool = True,
+        faded_line_ratio:       Optional[int]               = None,
+        make_smooth_after_applying_functions:Optional[bool] = None,
+        add_coordinates_texts:  bool                        = True,
         **kwargs: dict[str, Any],
         ):
         self.x_range = x_range
@@ -692,21 +697,23 @@ class NumberPlaneAnimationConfig:
         self.x_length = x_length
         self.y_length = y_length
         self.numberplaneType = numberplaneType
-        self.background_line_style = background_line_style
-        self.faded_line_style = faded_line_style
-        self.faded_line_ratio = faded_line_ratio
-        self.make_smooth_after_applying_functions = make_smooth_after_applying_functions
+        self.style = {k: v for k, v in {
+            "background_line_style": background_line_style,
+            "faded_line_style": faded_line_style,
+            "faded_line_ratio": faded_line_ratio,
+            "make_smooth_after_applying_functions": make_smooth_after_applying_functions,
+        }.items() if v is not None}
         self.kwargs = kwargs
-        self.plane = numberplaneType(
+        self.kwargs.update()
+        self.plane:base.CoordinateSystem = numberplaneType(
             x_range=x_range,
             y_range=y_range,
             x_length=x_length,
             y_length=y_length,
-            background_line_style=background_line_style,
-            faded_line_style=faded_line_style,
-            faded_line_ratio=faded_line_ratio,
-            make_smooth_after_applying_functions=make_smooth_after_applying_functions,
+            **self.style,
             **kwargs)
+        if add_coordinates_texts:
+            self.plane.add_coordinates()
         self.duration = duration
 class NumberPlaneAnimation(AxesAnimation):
     def __init__(
@@ -795,6 +802,98 @@ class PolarPlaneAnimation(AxesAnimation):
         super().__init__(planeconfig.plane, planeconfig.duration,
                          argsconfig=argsconfig, playconfig=playconfig, constructor=constructor, destructor=destructor)
 
+class CameraOrientationAnimation(Animation):
+    def __init__(
+        self,
+        phi:                Optional[float] = None,
+        theta:              Optional[float] = None,
+        gamma:              Optional[float] = None,
+        zoom:               Optional[float] = None,
+        focal_distance:     Optional[float] = None,
+        frame_center:       Optional[Union[Mobject, Sequence[float]]] = None,
+        **kwargs: Any
+        ):
+        """
+        Parameters
+        ----------
+        phi
+            The polar angle i.e the angle between Z_AXIS and Camera through ORIGIN in radians.
+
+        theta
+            The azimuthal angle i.e the angle that spins the camera around the Z_AXIS.
+
+        focal_distance
+            The focal_distance of the Camera.
+
+        gamma
+            The rotation of the camera about the vector from the ORIGIN to the Camera.
+
+        zoom
+            The zoom factor of the scene.
+
+        frame_center
+            The new center of the camera frame in cartesian coordinates.
+
+        """
+        super().__init__(None, 0, playconfig=kwargs)
+        self.phi = phi
+        self.theta = theta
+        self.gamma = gamma
+        self.zoom = zoom
+        self.focal_distance = focal_distance
+        self.frame_center = frame_center
+    @override
+    def inject_play_animation(self, scene):
+        scene.set_camera_orientation(
+            phi=self.phi,
+            theta=self.theta,
+            gamma=self.gamma,
+            zoom=self.zoom,
+            focal_distance=self.focal_distance,
+            frame_center=self.frame_center,
+            **self.play_config
+        )
+    @override
+    def release_play_animation(self, scene):
+        pass
+class CameraAnimation(Animation):
+    def __init__(
+        self,
+        *added_anims:       Animation,
+        phi:                Optional[float] = None,
+        theta:              Optional[float] = None,
+        gamma:              Optional[float] = None,
+        zoom:               Optional[float] = None,
+        focal_distance:     Optional[float] = None,
+        frame_center:       Optional[Union[Mobject, Sequence[float]]] = None,
+        **kwargs: Any
+        ):
+        super().__init__(None, 0, playconfig=kwargs)
+        self.phi = phi
+        self.theta = theta
+        self.gamma = gamma
+        self.zoom = zoom
+        self.focal_distance = focal_distance
+        self.frame_center = frame_center
+        self.added_anims = added_anims
+    @override
+    def inject_play_animation(self, scene):
+        anims = [
+            item.get_manim_animation() for item in self.added_anims
+        ]
+        scene.move_camera(
+            phi=self.phi,
+            theta=self.theta,
+            gamma=self.gamma,
+            zoom=self.zoom,
+            focal_distance=self.focal_distance,
+            frame_center=self.frame_center,
+            added_anims=anims,
+            **self.play_config
+        )
+    @override
+    def release_play_animation(self, scene):
+        pass
 class Timeline(base.ThreeDScene, Animation):
     def __init__(
         self,
@@ -815,7 +914,8 @@ class Timeline(base.ThreeDScene, Animation):
         if animations is None:
             animations = []
         # constructor of base.scene
-        super().__init__(renderer=renderer,
+        base.ThreeDScene.__init__(self,
+                         renderer=renderer,
                          camera_class=camera_class,
                          always_update_mobjects=always_update_mobjects,
                          random_seed=random_seed,
@@ -824,7 +924,7 @@ class Timeline(base.ThreeDScene, Animation):
                          default_angled_camera_orientation_kwargs=default_angled_camera_orientation_kwargs,
                          )
         # constructor of Animation
-        super(base.ThreeDScene, self).__init__(None, 0, argsconfig=argsconfig)
+        Animation.__init__(self, None, 0, argsconfig=argsconfig)
         # Timeline instance is a Sequence of Animation
         self.__timeline_animations:    List[Animation] = animations
     @override
@@ -858,53 +958,6 @@ class Timeline(base.ThreeDScene, Animation):
     def clear_animations(self):
         self.__timeline_animations.clear()
         return self
-
-class VectorHelper(any_class):
-    @property
-    def up(self) -> np.ndarray:
-        '''np.array((0.0, 1.0, 0.0))'''
-        return base.UP
-    @property
-    def down(self) -> np.ndarray:
-        '''np.array((0.0, -1.0, 0.0))'''
-        return base.DOWN
-    @property
-    def left(self) -> np.ndarray:
-        '''np.array((-1.0, 0.0, 0.0))'''
-        return base.LEFT
-    @property
-    def right(self) -> np.ndarray:
-        '''np.array((1.0, 0.0, 0.0))'''
-        return base.RIGHT
-    @property
-    def front(self) -> np.ndarray:
-        '''np.array((0.0, 0.0, 1.0))'''
-        return base.OUT
-    @property
-    def back(self) -> np.ndarray:
-        '''np.array((0.0, 0.0, -1.0))'''
-        return base.IN
-    @property
-    def zero(self) -> np.ndarray:
-        '''np.array((0.0, 0.0, 0.0))'''
-        return base.ORIGIN
-
-    @property
-    def ul(self) -> np.ndarray:
-        '''np.array((-1.0, 1.0, 0.0))'''
-        return base.UL
-    @property
-    def ur(self) -> np.ndarray:
-        '''np.array((1.0, 1.0, 0.0))'''
-        return base.UR
-    @property
-    def dl(self) -> np.ndarray:
-        '''np.array((-1.0, -1.0, 0.0))'''
-        return base.DL
-    @property
-    def dr(self) -> np.ndarray:
-        '''np.array((1.0, -1.0, 0.0))'''
-        return base.DR
 
 def set_animation_constructor(
     animations:     Union[Animation, Sequence[Animation]],

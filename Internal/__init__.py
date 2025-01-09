@@ -17,7 +17,7 @@ def ImportingThrow(
         print(messageBase.format_map(dict(module=moduleName, required=requierds_str)))
         print('Install it via command:')
         for i in requierds:
-            print(installBase.format_map(name=i))
+            print(installBase.format_map({"name":i}))
         if ex:
             raise ex
 
@@ -47,6 +47,7 @@ type Action3[_T1, _T2, _T3] = Callable[[_T1, _T2, _T3], None]
 type Action4[_T1, _T2, _T3, _T4] = Callable[[_T1, _T2, _T3, _T4], None]
 type Action5[_T1, _T2, _T3, _T4, _T5] = Callable[[_T1, _T2, _T3, _T4, _T5], None]
 type ActionW = Callable[[Sequence[Any]], None]
+type ClosuresCallable[_T] = Callable[[], _T]
 
 class type_class(ABC):
     def GetType(self):
@@ -179,6 +180,12 @@ class release_closures[_T](closures[_T]):
         self.callback = callback
     def __del__(self):
         self.invoke()
+class invoke_callable(any_class):
+    def __call__(self, *args, **kwargs):
+        if "invoke" in dir(self):
+            return self.invoke(*args, **kwargs)
+        else:
+            raise NotImplementedError(f"self<{self.SymbolName()}> invoke not implemented")
 # LightDiagram::ld::instance<_Ty>
 class restructor_instance[_Ty](left_value_reference[_Ty]):
     def __init__(
@@ -352,10 +359,14 @@ class atomic[_T](any_class):
 
 def create_py_file(path:str):
     with open(path, "w") as f:
-        f.write("""# -*- coding: utf-8 -*-\n""")
+        f.write("# -*- coding: utf-8 -*-\n")
+        f.write("from lekit.lazy import *\n")
+        f.write("\n")
+        f.write("def run():\n")
+        f.write("\tpass\n")
         f.write("\n")
         f.write(f"if __name__ == \"__main__\":\n")
-        f.write("\tpass\n")
+        f.write("\trun()\n")
 
 _TargetType = TypeVar("TargetType")
 def WrapperConfig2Instance(

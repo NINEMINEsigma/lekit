@@ -77,7 +77,8 @@ class tool_file(any_class):
     def __enter__(self):
         if self.is_open():
             return self
-        self.load()
+        if self.exists() and self.is_file():
+            self.load()
         return self
     @override
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -344,8 +345,10 @@ class tool_file(any_class):
         self.save_as_text(path)
 
     def get_size(self) -> int:
-        if self.is_dir():
-            return -1
+        '''
+        return:
+            return size of directory
+        '''
         return os.path.getsize(self.__file_path)
     def get_data_type(self) -> type:
         return type(self.data)
@@ -420,6 +423,7 @@ class tool_file(any_class):
             if ignore_folder and os.path.isdir(os.path.join(self.__file_path, content)):
                 continue
             result += 1
+        return result
     def dir_clear(self):
         for file in self.dir_tool_file_iter():
             file.remove()

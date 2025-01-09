@@ -50,6 +50,61 @@ class VideoWriterInstance(VideoWriter, any_class):
     def __del__(self):
         self.release()
 
+AffineFeature_feature2D = base.AffineFeature.create
+SIFT_Feature2D = base.SIFT.create
+ORB_Feature2D = base.ORB.create
+BRISK_Feature2D = base.BRISK.create
+AKAZE_Feature2D = base.AKAZE.create
+KAZE_Feature2D = base.KAZE.create
+MSER_Feature2D = base.MSER.create
+FastFeatureDetector_Feature2D = base.FastFeatureDetector.create
+AgastFeatureDetector_Feature2D = base.AgastFeatureDetector.create
+GFTTDetector_Feature2D = base.GFTTDetector.create
+SimpleBlobDetector_Feature2D = base.SimpleBlobDetector.create
+class Feature2DInstance[featrue:base.Feature2D](left_value_reference[featrue]):
+    def __init__(
+        self,
+        feature2D:Union[featrue, ClosuresCallable[featrue]]
+        ):
+        if isinstance(feature2D, base.Feature2D):
+            super().__init__(feature2D)
+        else:
+            super().__init__(feature2D())
+    def detect[Mat_or_Mats:Union[
+            MatLike,
+            base.UMat,
+            Sequence[MatLike],
+            Sequence[base.UMat]
+        ]](
+        self,
+        image:  Mat_or_Mats,
+        mask:   Optional[Mat_or_Mats] = None
+        ) -> Sequence[base.KeyPoint]:
+        return self.ref_value.detect(image, mask)
+    def compute[Mat_or_Mats:Union[
+            MatLike,
+            base.UMat,
+            Sequence[MatLike],
+            Sequence[base.UMat]
+        ]](
+        self,
+        image:          Mat_or_Mats,
+        keypoints:      Optional[Sequence[base.KeyPoint]] = None,
+        descriptors:    Optional[Mat_or_Mats] = None
+        ) -> Tuple[Sequence[base.KeyPoint], MatLike]:
+        return self.ref_value.compute(image, keypoints, descriptors)
+    def detectAndCompute[_Mat:Union[
+            MatLike,
+            base.UMat,
+        ]](
+        self,
+        image:          _Mat,
+        mask:           Optional[_Mat] = None,
+        descriptors:    Optional[_Mat] = None,
+        useProvidedKeypoints:bool = False
+        ) -> Tuple[Sequence[base.KeyPoint], MatLike]:
+        return self.ref_value.detectAndCompute(image, mask, descriptors, useProvidedKeypoints)
+
 def wait_key(delay:int):
     return base.waitKey(delay)
 def until_esc():
@@ -867,7 +922,6 @@ class ImageObject(left_np_ndarray_reference):
             kernel = self.get_rect_kernal((3, 3))
         return base.morphologyEx(self.image, base.MORPH_BLACKHAT, kernel, *args, **kwargs)
 
-
     # 绘制轮廓
     def drawContours(
         self,
@@ -984,6 +1038,146 @@ class ImageObject(left_np_ndarray_reference):
             contours=contours,
             hierarchy=hierarchy,
             offset=offset)]
+
+    # 图像匹配
+    def match_on_scene(
+        self,
+        scene_image:        Self,
+        # Feature2D config
+        featrue_type:       Optional[Union[
+            base.Feature2D,
+            ClosuresCallable[base.Feature2D],
+            Feature2DInstance
+        ]]                                              = SIFT_Feature2D,
+        optout_feature_kp_and_des_ref:
+                            Optional[left_value_reference[
+            Tuple[Sequence[base.KeyPoint], MatLike]
+        ]]                                              = None,
+        # Match Config
+        match_min_points:   int                         = 4,
+        # Draw rect Config
+        rect_color:         Tuple[int, int, int]        = (0, 255, 0),
+        rect_thickness:     int                         = 2,
+        # Draw match Config
+        out_drawMatches_ref:Optional[left_value_reference[MatLike]
+        ]                                               = None,
+        drawMatches_range:  Optional[Tuple[int, int]]   = None
+        ) -> MatLike:
+        '''
+        本图像作为目标特征
+
+        Args
+        ---
+        Target Image
+            scene_image:
+                识别的场景, 此图像将作为目标匹配的场景
+
+        Feature2D Config
+            type:
+                特征检测器类型/生成器/实例, 默认为SIFT
+            ref:
+                左值引用容器, ref_value为空时将用于存储特征点与描述符,
+                不为空则提取ref_value作为本次的特征点与描述符
+
+        Match Config
+            min_points:
+                匹配的最小点数, 小于此值则无法找到目标物体
+
+        Draw rect Config
+            color:
+                矩形框颜色, 默认为绿色
+            thickness:
+                矩形框厚度, 默认为2
+
+            Draw match Config
+                ref:
+                    左值引用容器, 将用于存储合成的对比图像
+                range:
+                    匹配点的绘制范围(靠前的匹配度高), 默认为全部绘制
+
+        Return
+        ---
+        MatLike: 绘制了方框的矩形
+        '''
+        # 读取目标图和场景图
+        target_img = self.get_grayscale()
+        scene_img = scene_image.get_grayscale()
+
+        # 初始化SIFT检测器
+        feature2D:Feature2DInstance = featrue_type if (
+            isinstance(featrue_type, Feature2DInstance)
+        ) else Feature2DInstance(featrue_type)
+
+        # 检测关键点和描述符
+        kp1:Sequence[base.KeyPoint] = None
+        des1:MatLike = None
+        if optout_feature_kp_and_des_ref is None:
+            kp1, des1 = feature2D.detectAndCompute(target_img, None)
+        else:
+            if optout_feature_kp_and_des_ref.ref_value is None:
+                kp1, des1 = feature2D.detectAndCompute(target_img, None)
+                optout_feature_kp_and_des_ref.ref_value = (kp1, des1)
+            else:
+                kp1, des1 = optout_feature_kp_and_des_ref.ref_value
+        kp2, des2 = feature2D.detectAndCompute(scene_img, None)
+
+        # 初始化BFMatcher
+        bf = base.BFMatcher(base.NORM_L2, crossCheck=True)
+
+        # 匹配描述符
+        matches = bf.match(des1, des2)
+        matches = sorted(matches, key=lambda x: x.distance)
+
+        # 如果匹配点数少于min_match_points个，无法找到目标物体
+        if len(matches) < match_min_points:
+            return None
+
+        # 提取匹配点的位置
+        src_pts = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+        dst_pts = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+
+        # 使用RANSAC算法找到单应性矩阵
+        M, _ = base.findHomography(src_pts, dst_pts, base.RANSAC, 5.0)
+
+        # 获取目标物体的边界框
+        h, w = target_img.shape
+        pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
+        dst = base.perspectiveTransform(pts, M)
+
+        # 在scene中绘制边界框
+        result = scene_image.image.copy()
+        base.polylines(
+            result,
+            [np.int32(dst)],
+            True,
+            rect_color,
+            rect_thickness,
+            base.LINE_AA
+            )
+
+        # 合成的绘制结果
+        if out_drawMatches_ref is not None:
+            if drawMatches_range is None:
+                out_drawMatches_ref.ref_value = base.drawMatches(
+                self.image,
+                kp1,
+                scene_image.image,
+                kp2,
+                matches,
+                None, flags=base.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+            )
+            else:
+                out_drawMatches_ref.ref_value = base.drawMatches(
+                self.image,
+                kp1,
+                scene_image.image,
+                kp2,
+                matches[drawMatches_range[0]:drawMatches_range[1]],
+                None, flags=base.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+            )
+
+        # 返回绘制了方框的结果
+        return result
 
 def get_new_noise(
     raw_image:  Optional[MatLike],
