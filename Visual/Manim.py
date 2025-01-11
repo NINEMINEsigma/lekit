@@ -89,29 +89,33 @@ class _TransformExample(base.Scene):
 
         self.wait()
 
-CDstructorType = Action2[Self, base.Scene]
+type CDstructorType[_Self:Any] = Action2[_Self, base.Scene]
 
 class AnimationConfig:
-    # delay_and_wait_until_pr -> delay(max time), wait_until_pr
-    delay_and_wait_until_pr:    Tuple[float, Optional[Callable[[], bool]]]                  = (0, None)
+    def __init__(
+        self,
+        delay_and_wait_until_pr:    Tuple[float, Optional[Callable[[], bool]]]  = (0, None),
+        animate_creater:            Union[ClosuresCallable[base.Animation]]     = base.Create,
+        ):
+        self.delay_and_wait_until_pr = delay_and_wait_until_pr
+        self.animate_creater = animate_creater
+
     @property
     def delay_or_max_time(self) -> float:
         return self.delay_and_wait_until_pr[0]
     @property
     def wait_until(self) -> Optional[Callable[[], bool]]:
         return self.delay_and_wait_until_pr[1]
-    # scene.play(<this.property>(self.ref_value), **self.play_config) -- see in Animation.inject_play_animation
-    animate_creater:            Union[base.Animation, Callable[[Mobject], base.Animation]]  = base.Create
 
-    def __init__(
-        self,
-        delay_and_wait_until_pr:    Tuple[float, Optional[Callable[[], bool]]]                  = (0, None),
-        animate_creater:            Union[base.Animation, Callable[[Mobject], base.Animation]]  = base.Create,
-        ):
-        self.delay_and_wait_until_pr = delay_and_wait_until_pr
-        self.animate_creater = animate_creater
     def copy(self):
         return AnimationConfig(self.delay_and_wait_until_pr, self.animate_creater)
+    def animate_create(self, element: Mobject, *args, **kwargs) -> base.Animation:
+        if self.animate_creater is None:
+            if isinstance(element, (base.Tex, base.Text)):
+                return base.Write(element, *args, **kwargs)
+            else:
+                return base.Create(element, *args, **kwargs)
+        return self.animate_creater(element, *args, **kwargs)
 class Animation(left_value_reference[Mobject]):
     def copy(self):
         return type(self)(self.ref_value,
@@ -128,8 +132,8 @@ class Animation(left_value_reference[Mobject]):
         *,
         argsconfig:                 Optional[AnimationConfig]   = None,
         playconfig:                 Optional[Dict[str, Any]]    = None,
-        constructor:                CDstructorType              = None,
-        destructor:                 CDstructorType              = None,
+        constructor:                CDstructorType[Self]        = None,
+        destructor:                 CDstructorType[Self]        = None,
         ):
         '''
         element:
@@ -144,14 +148,14 @@ class Animation(left_value_reference[Mobject]):
         self.play_config["run_time"] = duration
         # Build up self var
         self.m_animation_instance:  base.Animation              = None
-        self.cd_constructor:        CDstructorType              = constructor
-        self.cd_destructor:         CDstructorType              = destructor
+        self.cd_constructor:        CDstructorType[Self]        = constructor
+        self.cd_destructor:         CDstructorType[Self]        = destructor
         self.__cd_stats:            bool                        = False
     def get_manim_animation(self,*, from_:Optional[Mobject]=None):
         if from_ is not None:
-            return self.args_config.animate_creater(from_)
+            return self.args_config.animate_create(from_)
         if self.m_animation_instance is None:
-            self.m_animation_instance = self.args_config.animate_creater(self.ref_value)
+            self.m_animation_instance = self.args_config.animate_create(self.ref_value)
         return self.m_animation_instance
     def inject_play_animation(self, scene:base.ThreeDScene):
         scene.play(self.get_manim_animation(), **self.play_config)
@@ -225,10 +229,19 @@ def WrapperMobjects2Animations(
     *,
     argsconfig:                 Optional[AnimationConfig]   = None,
     playconfig:                 Optional[Dict[str, Any]]    = None,
-    constructor:                CDstructorType              = None,
-    destructor:                 CDstructorType              = None,
+    constructor:                CDstructorType[Animation]   = None,
+    destructor:                 CDstructorType[Animation]   = None,
     maker:                      Optional[Union[type, Callable]] = None
     ) -> List[Animation]:
+    '''
+    当输入是Animation时不做更改,
+    当输入是Mobject时使用maker创建Animation并使用输入的参数进行Animation的生成
+
+    Return
+    ---
+    return:
+        Animation列表
+    '''
     if maker is None:
         maker = Animation
     if isinstance(objs, Sequence) is False:
@@ -241,13 +254,56 @@ def WrapperMobjects2Animations(
                         constructor=constructor, destructor=destructor)
         result.append(obj)
     return result
+def WrapperMobjects2Vgroup(
+    *objs:Mobject,
+    **kwargs
+    ) -> base.VGroup:
+    return base.VGroup(*objs, **kwargs)
+def WrapperMobjects2VgroupAnimation(
+    duration:                   NumberLike,
+    *objs:Mobject,
+    argsconfig:                 Optional[AnimationConfig]   = None,
+    playconfig:                 Optional[Dict[str, Any]]    = None,
+    constructor:                CDstructorType[Self]        = None,
+    destructor:                 CDstructorType[Self]        = None,
+    **kwargs
+    ) -> Animation:
+    return Animation(WrapperMobjects2Vgroup(*objs, **kwargs),
+        duration, argsconfig=argsconfig, playconfig=playconfig, constructor=constructor, destructor=destructor)
+
+# Make config of line style
+def config_of_line_style(
+    stroke_width:       float                   = 6,
+    color_or_gradient:  Union[
+        base.ParsableManimColor,
+        Sequence[base.ParsableManimColor]
+    ]                                           = None,
+    **kwargs
+    ) -> Dict[str, Any]:
+    '''
+    using exmple:
+        func(**config_of_line_style(...))
+    '''
+    color = None
+    gradient = None
+    if color_or_gradient is not None:
+        if isinstance(color_or_gradient, Sequence):
+            gradient = to_tuple(color_or_gradient)
+        else:
+            color = color_or_gradient
+    return remove_none_value({
+        'stroke_width': stroke_width,
+        'color':        color,
+        "gradient":     gradient,
+        **kwargs
+    })
 
 # Make point
 def make_point(
     point:          MTypes.Point3D,
-    radius:         float = base.DEFAULT_DOT_RADIUS,
-    stroke_width:   float = 0,
-    fill_opacity:   float = 1.0,
+    radius:         float                   = base.DEFAULT_DOT_RADIUS,
+    stroke_width:   float                   = 0,
+    fill_opacity:   float                   = 1.0,
     color:          base.ParsableManimColor = base.WHITE,
     **kwargs
     ) -> base.Dot:
@@ -268,6 +324,7 @@ def do_make_line(
 def make_line(
     from_point:     Point3DTuple,
     to_point:       Point3DTuple,
+    stroke_width:   float = 6,
     buff:           float           = 0,
     path_arc:       Optional[float] = None,
     **kwargs,
@@ -277,7 +334,7 @@ def make_line(
         Animation(make_line(from_point, to_point), duration=0.5)
     '''
     return do_make_line(from_point, to_point, base.Line,
-                        buff=buff, path_arc=path_arc, **kwargs)
+            stroke_width=stroke_width, buff=buff, path_arc=path_arc, **kwargs)
 def make_arrow(
     from_point:     Point3DTuple,
     to_point:       Point3DTuple,
@@ -313,13 +370,14 @@ def make_circle(
     center:         enable_unwrapper2center_type = (0, 0, 0),
     # style
     radius:         float                   = 1,
+    stroke_width:   float = 6,
     **kwargs
     ) -> base.Circle:
     '''
     Create animation of circle:
         Animation(make_circle(center, radius), duration=0.5)
     '''
-    return base.Circle(radius, **kwargs).move_to(Unwrapper2Center(center))
+    return base.Circle(radius, stroke_width=stroke_width, **kwargs).move_to(Unwrapper2Center(center))
 def make_ellipse(
     # transform
     center:         enable_unwrapper2center_type    = (0, 0, 0),
@@ -329,13 +387,15 @@ def make_ellipse(
     # style
     width:          float                           = 1,
     height:         float                           = 1,
+    stroke_width:   float                           = 6,
     **kwargs
     ) -> base.Ellipse:
     '''
     Create animation of ellipse:
         Animation(make_ellipse(...), duration=0.5)
     '''
-    return base.Ellipse(width, height, **kwargs).move_to(Unwrapper2Center(center)).rotate(rotate_angle, rotate_axis, rotate_about_point)
+    return base.Ellipse(width, height, stroke_width=stroke_width,
+        **kwargs).move_to(Unwrapper2Center(center)).rotate(rotate_angle, rotate_axis, rotate_about_point)
 def make_arc(
     # transform
     center:                 MTypes.Point3D = base.ORIGIN,
@@ -343,6 +403,7 @@ def make_arc(
     rotate_axis:            MTypes.Vector3D             = base.OUT,
     rotate_about_point:     Optional[MTypes.Point3D]    = None,
     # style
+    stroke_width:   float = 6,
     radius:         float = 1.0,
     start_angle:    float = 0,
     angle:          float = base.TAU / 4,
@@ -352,7 +413,8 @@ def make_arc(
     '''
     Create animation of arc:
     '''
-    return base.Arc(radius, start_angle, angle, num_components, Unwrapper2Center(center),**kwargs).rotate(rotate_angle, rotate_axis, rotate_about_point)
+    return base.Arc(radius, start_angle, angle, num_components, Unwrapper2Center(center),
+            stroke_width=stroke_width, **kwargs).rotate(rotate_angle, rotate_axis, rotate_about_point)
 # Make polygon
 def make_regular_polygram(
     num_vertices:   int,
@@ -362,14 +424,15 @@ def make_regular_polygram(
     # style
     density:        int                             = 1,
     radius:         float                           = 1,
+    stroke_width:   float                           = 6,
     **kwargs
     ) -> base.RegularPolygram:
     '''
     Create animation of triangle:
         Animation(make_triangle(...), duration=0.5)
     '''
-    return base.RegularPolygram(num_vertices, density=density, radius=radius, start_angle=start_angle, **kwargs
-        ).move_to(Unwrapper2Center(center))
+    return base.RegularPolygram(num_vertices, density=density, radius=radius, start_angle=start_angle,
+            stroke_width=stroke_width, **kwargs).move_to(Unwrapper2Center(center))
 def make_polygram(
     vertices:       Iterable[MTypes.Point3D]        = [],
     # transform
@@ -379,6 +442,7 @@ def make_polygram(
     rotate_about_point:    Optional[MTypes.Point3D] = None,
     # style
     color:          base.ParsableManimColor         = base.BLUE,
+    stroke_width:   float                           = 6,
     **kwargs
     ) -> base.Polygram:
     '''
@@ -386,9 +450,9 @@ def make_polygram(
         Animation(make_polygram(...), duration=0.5)
     '''
     vertex_groups = tuple(vertices)
-    return base.Polygram(vertex_groups, color=color, **kwargs
-                        ).move_to(Unwrapper2Center(center)
-                        ).rotate(rotate_angle, rotate_axis, rotate_about_point)
+    return base.Polygram(vertex_groups, color=color,
+            stroke_width=stroke_width, **kwargs).move_to(Unwrapper2Center(center)
+            ).rotate(rotate_angle, rotate_axis, rotate_about_point)
 def make_square(
     side_length:            float,
     # transform
@@ -397,13 +461,14 @@ def make_square(
     rotate_axis:            MTypes.Vector3D             = base.OUT,
     rotate_about_point:     Optional[MTypes.Point3D]    = None,
     # style
+    stroke_width:           float                       = 6,
     **kwargs
     ) -> base.Square:
     '''
     Create animation of square:
         Animation(make_square(...), duration=0.5)
     '''
-    return base.Square(side_length=side_length, **kwargs
+    return base.Square(side_length=side_length, stroke_width=stroke_width, **kwargs
                         ).move_to(Unwrapper2Center(center)
                         ).rotate(rotate_angle, rotate_axis, rotate_about_point)
 def make_rectangle(
@@ -415,15 +480,16 @@ def make_rectangle(
     rotate_axis:            MTypes.Vector3D             = base.OUT,
     rotate_about_point:     Optional[MTypes.Point3D]    = None,
     # style
+    stroke_width:           float                       = 6,
     **kwargs
     ) -> base.Rectangle:
     '''
     Create animation of rectangle:
         Animation(make_rectangle(...), duration=0.5)
     '''
-    return base.Rectangle(width=width, height=height, **kwargs
-                        ).move_to(Unwrapper2Center(center)
-                        ).rotate(rotate_angle, rotate_axis, rotate_about_point)
+    return base.Rectangle(width=width, height=height,
+            stroke_width=stroke_width, **kwargs).move_to(Unwrapper2Center(center)
+            ).rotate(rotate_angle, rotate_axis, rotate_about_point)
 def make_rounded_rectangle(
     width:          float,
     height:         float,
@@ -434,33 +500,68 @@ def make_rounded_rectangle(
     rotate_axis:            MTypes.Vector3D             = base.OUT,
     rotate_about_point:     Optional[MTypes.Point3D]    = None,
     # style
+    stroke_width:           float                       = 6,
     **kwargs
     ) -> base.RoundedRectangle:
     '''
     Create animation of rounded rectangle:
         Animation(make_rounded_rectangle(...), duration=0.5)
     '''
-    return base.RoundedRectangle(width=width, height=height, corner_radius=corner_radius, **kwargs
-                        ).move_to(Unwrapper2Center(center)
-                        ).rotate(rotate_angle, rotate_axis, rotate_about_point)
+    return base.RoundedRectangle(width=width, height=height, corner_radius=corner_radius,
+        stroke_width=stroke_width, **kwargs).move_to(Unwrapper2Center(center)
+        ).rotate(rotate_angle, rotate_axis, rotate_about_point)
 # Make Tex
+def value_of_slant(is_italic:bool):
+    return base.ITALIC if is_italic else base.NORMAL
+def value_of_weight(is_bold:bool):
+    return base.BOLD if is_bold else base.NORMAL
 def make_tex(
-    text:           str,
+    text:                   Union[str,Tuple[str]],
     # transform
-    center:             enable_unwrapper2center_type    = (0, 0, 0),
+    center:                enable_unwrapper2center_type = (0, 0, 0),
     rotate_angle:           float                       = 0,
     rotate_axis:            MTypes.Vector3D             = base.OUT,
     rotate_about_point:     Optional[MTypes.Point3D]    = None,
     # style
+    color_or_gradient:      Optional[Union[
+        base.ParsableManimColor,
+        Iterator[base.ParsableManimColor]
+    ]]                                                  = None,
+    arg_separator:          str                         = "",
+    tex_environment:        str                         = "center",
+    text_item_color:        Dict[str, str]              = None,
     **kwargs
     ) -> base.Tex:
     '''
     Create animation of tex:
         Animation(make_tex(...), duration=0.5)
+        TextAnimation(make_tex(...), duration=0.5)
     '''
-    return base.Tex(text, **kwargs
+    # Init var
+    color_stats = color_or_gradient is not None
+    color_is_not_gradient = color_stats and isinstance(color_or_gradient, (Iterable, dict, list, tuple)) is False
+    # Set kwargs
+    if color_is_not_gradient:
+        kwargs.update({"color":color_or_gradient})
+    kwargs.update({
+        "arg_separator": arg_separator,
+        "tex_environment": tex_environment,
+    })
+    # Result
+    result:base.Tex = None
+    if isinstance(text, str):
+        result = base.Tex(text, **kwargs
                         ).move_to(Unwrapper2Center(center)
                         ).rotate(rotate_angle, rotate_axis, rotate_about_point)
+    else:
+        result = base.Tex(*text, **kwargs
+                        ).move_to(Unwrapper2Center(center)
+                        ).rotate(rotate_angle, rotate_axis, rotate_about_point)
+    if not color_is_not_gradient and color_stats:
+        result.set_color_by_gradient(color_or_gradient)
+    if text_item_color is not None:
+        result.set_color_by_tex_to_color_map(text_item_color)
+    return result
 def make_text(
     text:           str,
     # transform
@@ -469,15 +570,169 @@ def make_text(
     rotate_axis:            MTypes.Vector3D             = base.OUT,
     rotate_about_point:     Optional[MTypes.Point3D]    = None,
     # style
+    fill_opacity:           float                       = 1.0,
+    stroke_width:           float                       = 0,
+    font_size:              float                       = base.DEFAULT_FONT_SIZE,
+    line_spacing:           float                       = -1,
+    # 此系列用于控制全体文本的属性
+    color_or_gradient:      Optional[Union[
+        base.ParsableManimColor,
+        Iterator[base.ParsableManimColor]
+    ]]                                                  = None,
+    font:                   str                         = "",
+    slant:                  str                         = base.NORMAL,
+    weight:                 str                         = base.NORMAL,
+    # text_item系列用于控制文本子串的属性
+    text_item_color:        Dict[str, str]              = None,
+    text_item_font:         Dict[str, str]              = None,
+    text_item_gradient:     Dict[str, Tuple[str]]       = None,
+    text_item_slant:         Dict[str, str]              = None,
+    text_item_weight:       Dict[str, str]              = None,
+    tab_width:              int                         = 4,
+    warn_missing_font:      bool                        = True,
     **kwargs
     ) -> base.Text:
     '''
     Create animation of text:
         Animation(make_text(...), duration=0.5)
+        TextAniation(make_text(...), duration=0.5)
     '''
-    return base.Text(text, **kwargs
+    # Init var
+    color_stats = color_or_gradient is not None
+    color_is_not_gradient = color_stats and isinstance(color_or_gradient, (Iterator, tuple, dict, list)) is False
+    # Set kwargs
+    if color_is_not_gradient:
+        kwargs.update({"color":color_or_gradient})
+    kwargs.update({
+        "fill_opacity":fill_opacity,
+        "stroke_width":stroke_width,
+        "font_size":font_size,
+        "line_spacing":line_spacing,
+        "font":font,
+        "slant":slant,
+        "weight":weight,
+        "t2c":text_item_color,
+        "t2f":text_item_font,
+        "t2g":text_item_gradient,
+        "t2s":text_item_slant,
+        "t2w":text_item_weight,
+        "tab_width":tab_width,
+        "warn_missing_font":warn_missing_font
+    })
+    # Result
+    result = base.Text(text, **kwargs
                         ).move_to(Unwrapper2Center(center)
                         ).rotate(rotate_angle, rotate_axis, rotate_about_point)
+    if not color_is_not_gradient and color_stats:
+        result.set_color_by_gradient(color_or_gradient)
+    return result
+def make_markupText(
+    text:           str,
+    # transform
+    center:             enable_unwrapper2center_type    = (0, 0, 0),
+    rotate_angle:           float                       = 0,
+    rotate_axis:            MTypes.Vector3D             = base.OUT,
+    rotate_about_point:     Optional[MTypes.Point3D]    = None,
+    # style
+    fill_opacity:           float                       = 1,
+    stroke_width:           float                       = 0,
+    color_or_gradient:      Optional[Union[
+        base.ParsableManimColor,
+        Iterator[base.ParsableManimColor]
+    ]]                                                  = None,
+    font_size:              float                       = base.DEFAULT_FONT_SIZE,
+    line_spacing:           int                         = -1,
+    font:                   str                         = "",
+    slant:                  str                         = base.NORMAL,
+    weight:                 str                         = base.NORMAL,
+    justify:                bool                        = False,
+    tab_width:              int                         = 4,
+    height:                 int                         = None,
+    width:                  int                         = None,
+    should_center:          bool                        = True,
+    disable_ligatures:      bool                        = False,
+    warn_missing_font:      bool                        = True,
+    **kwargs
+    ) -> base.MarkupText:
+    '''
+    Create animation of text:
+        Animation(make_text(...), duration=0.5)
+        TextAniation(make_text(...), duration=0.5)
+    '''
+    # Init var
+    color_stats = color_or_gradient is not None
+    color_is_not_gradient = color_stats and isinstance(color_or_gradient, (Iterator, tuple, dict, list)) is False
+    # Set kwargs
+    if color_is_not_gradient:
+        kwargs.update({"color":color_or_gradient})
+    kwargs.update({
+        "fill_opacity":fill_opacity,
+        "stroke_width":stroke_width,
+        "font_size":font_size,
+        "line_spacing":line_spacing,
+        "font":font,
+        "slant":slant,
+        "weight":weight,
+        "tab_width":tab_width,
+        "warn_missing_font":warn_missing_font,
+        "justify":justify,
+        "height":height,
+        "width":width,
+        "should_center":should_center,
+        "disable_ligatures":disable_ligatures,
+    })
+    # Result
+    result = base.MarkupText(text, **kwargs
+                        ).move_to(Unwrapper2Center(center)
+                        ).rotate(rotate_angle, rotate_axis, rotate_about_point)
+    if not color_is_not_gradient and color_stats:
+        result.set_color_by_gradient(color_or_gradient)
+    return result
+def make_bulleted_tex(
+    *items:             str,
+    buff:               float           = base.MED_LARGE_BUFF,
+    dot_scale_factor:   int             = 2,
+    tex_environment:    Optional[Any]   = None,
+    **kwargs,
+    ) -> base.Tex:
+    return base.BulletedList(*items,
+        buff=buff,dot_scale_factor=dot_scale_factor,tex_environment=tex_environment,
+        **kwargs)
+def make_title(
+        *text_parts,
+        include_underline:              bool = True,
+        match_underline_width_to_text:  bool = False,
+        underline_buff:                 bool = base.MED_SMALL_BUFF,
+        **kwargs,
+        ) -> base.Tex:
+    return base.Title(*text_parts,
+        include_underline=include_underline, match_underline_width_to_text=match_underline_width_to_text,
+        underline_buff=underline_buff, **kwargs)
+class TextAnimation(Animation):
+    def __init__(
+        self,
+        text:           Union[str, base.Text, base.Tex, base.MarkupText],
+        duration:       float,
+        *,
+        maker:          ClosuresCallable[Union[
+            base.Text,
+            base.Tex
+        ]]                                                  = make_text,
+        argsconfig:     Optional[AnimationConfig]           = None,
+        playconfig:     Optional[Dict[str, Any]]            = None,
+        constructor:    Optional[CDstructorType[Self]]      = None,
+        destructor:     Optional[CDstructorType[Self]]      = None,
+        **kwargs
+        ) -> None:
+        target = maker(text, **kwargs) if isinstance(text, str) else text
+        super().__init__(target, duration,
+            argsconfig=argsconfig, playconfig=playconfig, constructor=constructor, destructor=destructor)
+    @property
+    def color(self):
+        return self.ref_value.color
+    @color.setter
+    def color(self, value:base.ParsableManimColor):
+        self.ref_value.color = value
 
 Points_Generater_or_Iter = Union[
         # result: stats, current point
@@ -638,8 +893,8 @@ class AxesAnimation(Animation):
         duration:       float,
         argsconfig:     Optional[AnimationConfig]           = None,
         playconfig:     Optional[Dict[str, Any]]            = None,
-        constructor:    CDstructorType                      = None,
-        destructor:     CDstructorType                      = None,
+        constructor:    CDstructorType[Self]                = None,
+        destructor:     CDstructorType[Self]                = None,
         ):
         super().__init__(plane_element, duration,
             argsconfig=argsconfig, playconfig=playconfig, constructor=constructor, destructor=destructor)
@@ -673,6 +928,15 @@ class AxesAnimation(Animation):
         point.move_to(pos)
         tex.next_to(point, label_toward)
         return point, tex
+    def make_point_vgroup(
+        self,
+        *coords:    Union[float, Sequence[float], Sequence[Sequence[float]], np.ndarray],
+        point_or_point_config:      Optional[Union[base.Dot, Dict[str, Any]]] = None,
+        tex_or_tex_config:          Optional[Union[base.Tex, Dict[str, Any]]] = None,
+        label_toward:               MTypes.Vector3D                           = base.UR
+        ):
+        return base.VGroup(*self.make_point(*coords,
+            point_or_point_config=point_or_point_config, tex_or_tex_config=tex_or_tex_config, label_toward=label_toward))
 
 class NumberPlaneAnimationConfig:
     def __init__(
@@ -683,7 +947,12 @@ class NumberPlaneAnimationConfig:
         y_range:            Optional[Sequence[NumberLike]]  = None,
         x_length:           Optional[float]                 = None,
         y_length:           Optional[float]                 = None,
-        numberplaneType:    Union[Callable, type]           = base.NumberPlane,
+        numberplaneType:    Union[
+            Callable[[Any], base.CoordinateSystem],
+            Typen[base.NumberPlane],
+            Typen[base.ThreeDAxes],
+            Typen[base.ComplexPlane]
+        ]                                                   = base.NumberPlane,
         # style
         background_line_style:  Optional[Dict[str, Any]]    = None,
         faded_line_style:       Optional[Dict[str, Any]]    = None,
@@ -721,8 +990,8 @@ class NumberPlaneAnimation(AxesAnimation):
         planeconfig:    Optional[NumberPlaneAnimationConfig] = None,
         argsconfig:     Optional[AnimationConfig]            = None,
         playconfig:     Optional[Dict[str, Any]]             = None,
-        constructor:    CDstructorType                       = None,
-        destructor:     CDstructorType                       = None,
+        constructor:    CDstructorType[Self]                 = None,
+        destructor:     CDstructorType[Self]                 = None,
         ):
         if planeconfig is None:
             planeconfig = NumberPlaneAnimationConfig()
@@ -793,8 +1062,8 @@ class PolarPlaneAnimation(AxesAnimation):
         planeconfig:    Optional[PolarPlaneAnimationConfig] = None,
         argsconfig:     Optional[AnimationConfig]           = None,
         playconfig:     Optional[Dict[str, Any]]            = None,
-        constructor:    CDstructorType                      = None,
-        destructor:     CDstructorType                      = None,
+        constructor:    CDstructorType[Self]                = None,
+        destructor:     CDstructorType[Self]                = None,
         ):
         if planeconfig is None:
             planeconfig = PolarPlaneAnimationConfig()
@@ -961,7 +1230,7 @@ class Timeline(base.ThreeDScene, Animation):
 
 def set_animation_constructor(
     animations:     Union[Animation, Sequence[Animation]],
-    constructor:    CDstructorType
+    constructor:    CDstructorType[Animation]
     ):
     if isinstance(animations, Animation):
         animations.cd_constructor = constructor
@@ -972,7 +1241,7 @@ def set_animation_constructor(
         raise ValueError(f"animations must be Animation or Sequence[Animation], but current is {type(animations)}")
 def set_animation_destructor(
     animations:     Union[Animation, Sequence[Animation]],
-    destructor:     CDstructorType
+    destructor:     CDstructorType[Animation]
     ):
     if isinstance(animations, Animation):
         animations.cd_destructor = destructor

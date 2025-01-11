@@ -47,7 +47,7 @@ type Action3[_T1, _T2, _T3] = Callable[[_T1, _T2, _T3], None]
 type Action4[_T1, _T2, _T3, _T4] = Callable[[_T1, _T2, _T3, _T4], None]
 type Action5[_T1, _T2, _T3, _T4, _T5] = Callable[[_T1, _T2, _T3, _T4, _T5], None]
 type ActionW = Callable[[Sequence[Any]], None]
-type ClosuresCallable[_T] = Callable[[], _T]
+type ClosuresCallable[_T] = Union[Callable[[Optional[None]], _T], Typen[_T]]
 
 class type_class(ABC):
     def GetType(self):
@@ -394,6 +394,20 @@ def WrapperConfig2Instance(
         return typen_or_generater(*datahead_of_config_or_instance, *args, **kwargs)
     else:
         return typen_or_generater(datahead_of_config_or_instance, *args, **kwargs)
+
+def remove_none_value[_T:Union[
+        dict, tuple, list
+    ]](data:_T) -> _T:
+    if isinstance(data, dict):
+        return {k: v for k, v in data.items() if v is not None}
+    elif isinstance(data, (tuple, list)):
+        return type(data)(v for v in data if v is not None)
+    else:
+        raise ValueError(f"remove_none_value not support this type<{type(data)}>")
+def to_list[_DataTy, _T:Sequence[_DataTy]](data:_T) -> _T:
+    return data if isinstance(data, list) else list(data)
+def to_tuple[_DataTy, _T:Sequence[_DataTy]](data:_T) -> _T:
+    return data if isinstance(data, tuple) else tuple(data)
 
 if __name__ == "__main__":
     ref = left_value_reference[int](5.5)

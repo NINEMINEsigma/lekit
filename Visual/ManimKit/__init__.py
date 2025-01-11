@@ -9,7 +9,7 @@ class UncreateDestructor(invoke_callable):
                   argsconfig=AnimationConfig(animate_creater=base.Uncreate)
             ).play_animation(scene)
 
-class VectorHelper(any_class):
+class VectorHelper:
     @property
     def up(self) -> np.ndarray:
         '''np.array((0.0, 1.0, 0.0))'''
@@ -55,3 +55,32 @@ class VectorHelper(any_class):
     def dr(self) -> np.ndarray:
         '''np.array((1.0, -1.0, 0.0))'''
         return base.DR
+
+class ColorHelper:
+    @property
+    def black(self) -> np.ndarray:
+        '''np.array((0.0, 0.0, 0.0))'''
+        return base.BLACK
+    @property
+    def white(self) -> np.ndarray:
+        '''np.array((1.0, 1.0, 1.0))'''
+        return base.WHITE
+    @property
+    def gray(self) -> np.ndarray:
+        '''np.array((0.5, 0.5, 0.5))'''
+        return base.GRAY
+    @property
+    def red(self) -> np.ndarray:
+        '''np.array((1.0, 0.0, 0.0))'''
+        return base.RED
+    @property
+    def green(self) -> np.ndarray:
+        '''np.array((0.0, 1.0, 0.0))'''
+        return base.GREEN
+    @property
+    def blue(self) -> np.ndarray:
+        '''np.array((0.0, 0.0, 1.0))'''
+        return base.BLUE
+
+vector_helper = VectorHelper()
+color_helper = ColorHelper()
