@@ -98,13 +98,13 @@ class base_value_reference[_T](type_class):
     def _clear_ref_value(self):
         self._ref_value = None
     @override
-    def GetType(self):
+    def GetRealType(self):
         return self.__real_type
     @override
     def SymbolName(self) -> str:
         if self._ref_value is None:
-            return f"{self.GetType()}<None, generate_on\n{self.generate_trackback}\n>"
-        return f"{self.GetType().__name__}<generate on\n{self.generate_trackback}\n>&"
+            return f"{self.GetRealType()}<None, generate_on\n{self.generate_trackback}\n>"
+        return f"{self.GetRealType().__name__}<generate on\n{self.generate_trackback}\n>&"
     @override
     def ToString(self) -> str:
         if self._ref_value is None:
@@ -127,12 +127,12 @@ class left_value_reference[_T](base_value_reference):
         return self._ref_value
     @ref_value.setter
     def ref_value(self, value) -> _T:
-        if value is None or isinstance(value, self.GetType()):
+        if value is None or isinstance(value, self.GetRealType()):
             self._ref_value = value
-        elif self.GetType() == type(None):
+        elif self.GetRealType() == type(None):
             self._reinit_ref_value(value)
         else:
-            raise TypeError(f"Cannot assign {type(value)} to {self.GetType()}")
+            raise TypeError(f"Cannot assign {type(value)} to {self.GetRealType()}")
         return value
     def __bool__(self):
         return self._ref_value is not None
@@ -155,6 +155,7 @@ class any_class(type_class, ABC):
     def Share[_T](self, out_value:left_value_reference[_T]) -> Self:
         if out_value is None:
             raise ValueError("out_value cannot be None")
+        if out_value.GetType()
         out_value.ref_value = self
         return self
 
@@ -168,7 +169,7 @@ class null_package[_T](left_value_reference[_T]):
         typen:Typen[_T],
         call:Action[_T]
         ) -> Self:
-        if self.GetType() == typen:
+        if self.GetRealType() == typen:
             call(self.ref_value)
         return self
 class closures[_T](left_value_reference[_T]):
@@ -264,9 +265,60 @@ class iter_callable_range(Callable[[], bool], any_class):
         return result
 
 # using as c#: func(out var obj)
+_out_static_value_reference = []
 class out_value_reference[_T](left_value_reference[_T]):
+    '''
+    用于作为输出参数，使用时需要使用out_value_reader来读取输出值,
+    顺序压参数入栈
+    '''
     def __init__(self, value:Optional[_T] = None):
         super().__init__(value)
+    def __del__(self):
+        _out_static_value_reference.append(self.ref_value)
+class out_value_reader[_T](right_value_refenence[_T]):
+    '''
+    用于读取对应out_value_reference的输出值,
+    顺序弹参数出栈
+    '''
+    def __init__(self):
+        if len(_out_static_value_reference) != 0:
+            super().__init__(_out_static_value_reference.pop())
+        else:
+            super().__init__(None)
+
+# using as c#: event
+class ActionEvent(invoke_callable):
+    def __init__(self, actions:Sequence[Callable]):
+        super().__init__()
+        self.__actions:List[Callable]   = [action for action in actions]
+        self.call_indexs:List[int]      = [i for i in range(len(actions))]
+    def __inject_invoke(self, *args, **kwargs):
+        for index in self.call_indexs:
+            self.__actions[index](*args, **kwargs)
+    def init_call_index(self):
+        self.call_indexs = [i for i in range(len(self.__actions))]
+    def add_action(self, action:Callable):
+        self.__actions.append(action)
+        self.call_indexs.append(len(self.__actions)-1)
+        return self
+    def add_actions(self, actions:Sequence[Callable]):
+        for action in actions:
+            self.add_action(action)
+        return self
+    def __internal_remove_action(self, action:Callable):
+        if action in self.__actions:
+            index = self.__actions.index(action)
+            self.__actions.remove(action)
+            self.call_indexs.remove(index)
+            for i in range(len(self.call_indexs)):
+                if self.call_indexs[i] > index:
+                    self.call_indexs[i] -= 1
+            return True
+        return False
+    def remove_action(self, action:Callable):
+        while self.__internal_remove_action(action):
+            pass
+        return self
 
 # region instance
 

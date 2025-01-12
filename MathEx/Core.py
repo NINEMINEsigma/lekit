@@ -1,6 +1,8 @@
 from typing                         import *
 from lekit.Internal                 import *
 import numpy                        as     np
+import cv2                          as     cv2
+from cv2.typing                     import *
 import scipy                        as     sci_base
 from scipy          import optimize as     sci_opt
 
@@ -293,6 +295,14 @@ NumberBetween01 = Union[float, NpFloatNumber]
 FloatBetween01 = float
 def clamp01(value: NumberLike) -> NumberBetween01:
     return make_clamp(value, 0, 1)
+
+class shape_class(any_class):
+
+
+
+
+
+
 
 EquationsLike = Callable[[Sequence[float]], Sequence[float]]
 class EquationsCallable(EquationsLike):
