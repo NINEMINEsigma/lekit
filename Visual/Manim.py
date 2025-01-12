@@ -184,6 +184,10 @@ class Animation(left_value_reference[Mobject]):
     def cd_stats(self):
         return self.__cd_stats
 
+    def move(self, *movement:Point3DTuple) -> Self:
+        if self:
+            self.ref_value.shift(Wrapper2MPoint3D(p) for p in movement)
+        return self
     def move_to(
         self,
         to_point:   Point3DTuple
@@ -271,13 +275,31 @@ def WrapperMobjects2VgroupAnimation(
     return Animation(WrapperMobjects2Vgroup(*objs, **kwargs),
         duration, argsconfig=argsconfig, playconfig=playconfig, constructor=constructor, destructor=destructor)
 
-# Make config of line style
+# Make config of style
+def do_config(from_:Optional[Dict[str, Any]], **kwargs) -> Dict[str, Any]:
+    from_.update(kwargs)
+    return remove_none_value(from_)
+def config_of_point_style(
+    radius:         float                   = base.DEFAULT_DOT_RADIUS,
+    stroke_width:   float                   = 0,
+    fill_opacity:   float                   = 1.0,
+    color:          base.ParsableManimColor = base.WHITE,
+    **kwargs
+    ) -> Dict[str, Any]:
+    return remove_none_value({
+        'radius':       radius,
+        'stroke_width': stroke_width,
+        'fill_opacity': fill_opacity,
+        'color':        color,
+        **kwargs
+    })
 def config_of_line_style(
     stroke_width:       float                   = 6,
     color_or_gradient:  Union[
         base.ParsableManimColor,
         Sequence[base.ParsableManimColor]
     ]                                           = None,
+    buff:               float                   = base.MED_SMALL_BUFF,
     **kwargs
     ) -> Dict[str, Any]:
     '''
@@ -295,9 +317,71 @@ def config_of_line_style(
         'stroke_width': stroke_width,
         'color':        color,
         "gradient":     gradient,
+        "buff":         buff,
         **kwargs
     })
-
+def config_of_circle_style(
+    radius:         float = 1,
+    stroke_width:   float = 6,
+    **kwargs
+    ) -> Dict[str, Any]:
+    return remove_none_value({
+        'radius':       radius,
+        'stroke_width': stroke_width,
+        **kwargs
+    })
+def config_of_text_style(
+    font:           Optional[str]           = None,
+    size:           float                   = 0.5,
+    color_or_gradient:  Union[
+        base.ParsableManimColor,
+        Sequence[base.ParsableManimColor]
+    ]                                       = None,
+    slant:          str                     = base.NORMAL,
+    weight:         str                     = base.NORMAL,
+    **kwargs
+    ) -> Dict[str, Any]:
+    color = None
+    gradient = None
+    if color_or_gradient is not None:
+        if isinstance(color_or_gradient, Sequence):
+            gradient = to_tuple(color_or_gradient)
+        else:
+            color = color_or_gradient
+    return remove_none_value({
+        "font":         font,
+        "size":         size,
+        "color":        color,
+        "gradient":     gradient,
+        "slant":        slant,
+        "weight":       weight,
+        **kwargs
+    })
+def config_of_fill_style(
+    fill_opacity:   float                   = 1.0,
+    fill_color:     base.ParsableManimColor = base.WHITE,
+    **kwargs
+    ) -> Dict[str, Any]:
+    return remove_none_value({
+        'fill_opacity': fill_opacity,
+        'fill_color':   fill_color,
+        **kwargs
+    })
+def merge_configs_not_check_none(*configs:Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    result:Dict[str, Any] = {}
+    for config in configs:
+        for key, value in config.items():
+            if value is not None or key not in result:
+                result[key] = value
+    result.update(kwargs)
+    return result
+def merge_configs(*configs:Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    result:Dict[str, Any] = {}
+    for config in configs:
+        for key, value in remove_none_value(config).items():
+            result[key] = value
+    result.update(remove_none_value(kwargs))
+    return result
 # Make point
 def make_point(
     point:          MTypes.Point3D,
@@ -318,9 +402,13 @@ def do_make_line(
     to_point:       Point3DTuple,
     typen:          Union[type, Callable[[Point3DTuple, Point3DTuple], Union[Animation, Mobject]]],
     /,
+    gradient:       Optional[tuple] = None,
     **kwargs,
     ) -> Union[Animation, Mobject]:
-    return typen(Wrapper2MPoint3D(from_point), Wrapper2MPoint3D(to_point), **kwargs)
+    result = typen(Wrapper2MPoint3D(from_point), Wrapper2MPoint3D(to_point), **kwargs)
+    if gradient is not None:
+        result.set_color_by_gradient(gradient)
+    return result
 def make_line(
     from_point:     Point3DTuple,
     to_point:       Point3DTuple,
@@ -367,10 +455,10 @@ def make_dashedline(
 # Make circle
 def make_circle(
     # transform
-    center:         enable_unwrapper2center_type = (0, 0, 0),
+    center:         enable_unwrapper2center_type    = (0, 0, 0),
     # style
-    radius:         float                   = 1,
-    stroke_width:   float = 6,
+    radius:         float                           = 1,
+    stroke_width:   float                           = 6,
     **kwargs
     ) -> base.Circle:
     '''
@@ -733,6 +821,42 @@ class TextAnimation(Animation):
     @color.setter
     def color(self, value:base.ParsableManimColor):
         self.ref_value.color = value
+# Make ball
+def make_ball(
+    radius:                 float               = 1,
+    surface_piece_config:   dict                = {},
+    fill_color:             base.ParsableManimColor = base.BLUE_D,
+    fill_opacity:           float               = 1,
+    checkerboard_colors:    Union[
+        Sequence[base.ParsableManimColor], bool
+    ]                                           = [base.BLUE_D, base.BLUE_E],
+    stroke_color:           base.ParsableManimColor = base.LIGHT_GREY,
+    stroke_width:           float               = 0.5,
+    should_make_jagged:     bool                = False,
+    pre_function_handle_to_anchor_scale_factor: float = 0.00001,
+    **kwargs
+    ) -> base.Surface:
+    return base.Surface(
+            lambda u, v: np.array(
+                [
+                    radius * np.cos(u) * np.cos(v),
+                    radius * np.cos(u) * np.sin(v),
+                    radius * np.sin(u),
+                ]
+            ),
+            v_range=[0, base.TAU],
+            u_range=[-base.PI / 2, base.PI / 2],
+            resolution=(15,32),
+            surface_piece_config=surface_piece_config,
+            fill_color=fill_color,
+            fill_opacity=fill_opacity,
+            checkerboard_colors=checkerboard_colors,
+            stroke_color=stroke_color,
+            stroke_width=stroke_width,
+            should_make_jagged=should_make_jagged,
+            pre_function_handle_to_anchor_scale_factor=pre_function_handle_to_anchor_scale_factor,
+            **kwargs
+        )
 
 Points_Generater_or_Iter = Union[
         # result: stats, current point
@@ -1074,8 +1198,8 @@ class PolarPlaneAnimation(AxesAnimation):
 class CameraOrientationAnimation(Animation):
     def __init__(
         self,
-        phi:                Optional[float] = None,
-        theta:              Optional[float] = None,
+        phi:                Optional[float] = 75*base.DEGREES,
+        theta:              Optional[float] = 180*base.DEGREES,
         gamma:              Optional[float] = None,
         zoom:               Optional[float] = None,
         focal_distance:     Optional[float] = None,
@@ -1125,41 +1249,44 @@ class CameraOrientationAnimation(Animation):
     @override
     def release_play_animation(self, scene):
         pass
-class CameraAnimation(Animation):
+class CameraMovementAnimation(Animation):
     def __init__(
         self,
+        duration:           float,
         *added_anims:       Animation,
-        phi:                Optional[float] = None,
-        theta:              Optional[float] = None,
+        phi:                Optional[float] = 75*base.DEGREES,
+        theta:              Optional[float] = 180*base.DEGREES,
         gamma:              Optional[float] = None,
         zoom:               Optional[float] = None,
         focal_distance:     Optional[float] = None,
         frame_center:       Optional[Union[Mobject, Sequence[float]]] = None,
         **kwargs: Any
         ):
-        super().__init__(None, 0, playconfig=kwargs)
-        self.phi = phi
-        self.theta = theta
-        self.gamma = gamma
-        self.zoom = zoom
-        self.focal_distance = focal_distance
-        self.frame_center = frame_center
+        play_config = kwargs
+        play_config.update({
+            "phi":phi,
+            "theta":theta,
+            "gamma":gamma,
+            "zoom":zoom,
+            "focal_distance":focal_distance,
+            "frame_center":frame_center
+        })
+        super().__init__(None, duration, playconfig=play_config)
         self.added_anims = added_anims
     @override
     def inject_play_animation(self, scene):
-        anims = [
+        anims = remove_none_value([
             item.get_manim_animation() for item in self.added_anims
-        ]
-        scene.move_camera(
-            phi=self.phi,
-            theta=self.theta,
-            gamma=self.gamma,
-            zoom=self.zoom,
-            focal_distance=self.focal_distance,
-            frame_center=self.frame_center,
+        ])
+        config = remove_none_value(self.play_config)
+        # config中还有一个run_time(duration)
+        if len(config) > 1:
+            scene.move_camera(
             added_anims=anims,
-            **self.play_config
-        )
+            **config
+            )
+        else:
+            scene.move_camera(added_anims=anims, phi=75*base.DEGREES, theta=180*base.DEGREES, gamma=0, zoom=1)
     @override
     def release_play_animation(self, scene):
         pass
@@ -1203,7 +1330,11 @@ class Timeline(base.ThreeDScene, Animation):
     @override
     def inject_play_animation(self, scene:base.Scene):
         for animation in self.__timeline_animations:
-            animation.play_animation(scene)
+            try:
+                animation.play_animation(scene)
+            except BaseException as ex:
+                print(f"animation<instance={animation}, ref={animation.ref_value}, symbol={animation.SymbolName()}> failed, {ex}")
+                raise ex
         self.release_play_animation(self)
     @override
     def construct(self):
@@ -1250,6 +1381,14 @@ def set_animation_destructor(
             animation.cd_destructor = destructor
     else:
         raise ValueError(f"animations must be Animation or Sequence[Animation], but current is {type(animations)}")
+
+# constexpr
+
+DEGREES = base.DEGREES
+def to_degrees(val):
+    return val * base.DEGREES
+
+#
 
 if __name__ == "__main__":
     pass

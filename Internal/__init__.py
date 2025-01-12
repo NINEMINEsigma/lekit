@@ -49,7 +49,12 @@ type Action5[_T1, _T2, _T3, _T4, _T5] = Callable[[_T1, _T2, _T3, _T4, _T5], None
 type ActionW = Callable[[Sequence[Any]], None]
 type ClosuresCallable[_T] = Union[Callable[[Optional[None]], _T], Typen[_T]]
 
+def format_traceback_info():
+    return ''.join(traceback.format_stack()[:-1])
+
 class type_class(ABC):
+    def __init__(self):
+        self.generate_trackback = format_traceback_info()
     def GetType(self):
         return type(self)
     def SymbolName(self) -> str:
@@ -85,6 +90,7 @@ class type_class(ABC):
         return True
 class base_value_reference[_T](type_class):
     def __init__(self, ref_value:_T):
+        super().__init__()
         self._reinit_ref_value(ref_value)
     def _reinit_ref_value(self, value):
         self._ref_value = value
@@ -97,8 +103,8 @@ class base_value_reference[_T](type_class):
     @override
     def SymbolName(self) -> str:
         if self._ref_value is None:
-            return "None"
-        return f"{self.GetType().__name__}&"
+            return f"{self.GetType()}<None, generate_on\n{self.generate_trackback}\n>"
+        return f"{self.GetType().__name__}<generate on\n{self.generate_trackback}\n>&"
     @override
     def ToString(self) -> str:
         if self._ref_value is None:
@@ -144,6 +150,8 @@ class right_value_refenence[_T](type_class):
     def const_ref_value(self) -> _T:
         return self.__ref_value
 class any_class(type_class, ABC):
+    def __init__(self):
+        super().__init__()
     def Share[_T](self, out_value:left_value_reference[_T]) -> Self:
         if out_value is None:
             raise ValueError("out_value cannot be None")
