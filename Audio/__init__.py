@@ -27,4 +27,4 @@ try:
     import speech_recognition as _
     from lekit.Audio.Vocal import *
 except ImportError as ex:
-    ImportingThrow(ex, "Vocal", ["speech_recognition"])
+    ImportingThrow(ex, "Vocal", ["SpeechRecognition"])

@@ -18,4 +18,4 @@ try:
     import jieba as _
     from lekit.Str.Core import *
 except ImportError as ex:
-    ImportingThrow(ex, "String-Core", ["pathlib"])
+    ImportingThrow(ex, "String-Core", ["pathlib", "jieba"])

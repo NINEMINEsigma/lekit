@@ -1,6 +1,6 @@
 from typing                                                 import *
 from lekit.MathEx.Transform                                 import *
-from lekit.File.Core                                        import tool_file, UnWrapper as Unwrapper2Str
+from lekit.File.Core                                        import tool_file, UnWrapper as Unwrapper2Str, is_loss_tool_file
 from selenium                                               import webdriver
 from selenium.webdriver.remote.webdriver                    import WebDriver
 from selenium.webdriver.remote.webelement                   import WebElement
@@ -23,19 +23,20 @@ wait_enable_type = Literal[
     if_wait_enable_type,
     implicitly_wait_enable_type
     ]
+type ByTypen = str
 
-class selunit:
+class selunit(any_class):
     """ instance of selenium functions """
 
     #web browser driver(default is MSedge)
     # "" __browser ""
     def __init__(
             self,
-            browser:    WebDriver   = webdriver.Edge(),
+            browser:    WebDriver   = None,
             transform:  abs_box     = Rect(int(50), int(50), int(900), int(800)),
             delay = 3):
         if browser is None:
-            raise ValueError("browser is none")
+            browser = webdriver.Edge()
         self.__browser:                 WebDriver                           = browser
         self.__transform:               abs_box                             = transform
         self.delay:                     float                               = delay
@@ -44,13 +45,22 @@ class selunit:
         self.__if_wait_pred:            Callable[[WebDriver,float],bool]    = None
         self.current_select_element:    WebElement                          = None
     def __del__(self):
-        self.__browser.close()
+        self.browser.close()
 
     def get_browser(self) -> WebDriver:
         '''
         get basic browser driver
         '''
         return self.__browser
+    @property
+    def browser(self) -> WebDriver:
+        '''
+        get basic browser driver
+        '''
+        return self.get_browser()
+    def quit(self) -> Self:
+        self.browser.quit()
+        return self
 
     #set or get attributes about time-wait
     @property
@@ -78,6 +88,16 @@ class selunit:
         else:
             time.sleep(self.delay)
         return self
+    def wait_without_notify(self, value:float) -> Self:
+        time.sleep(value)
+        return self
+
+    # toolkit of wait
+    def make_wait_task(
+            self, 
+            timeout:    float = 10,
+            ) -> WaitTask:
+        return WaitTask(self.browser, timeout)
 
     #function pred is bool(WebDriver,delay:float)
     #can catch from EC
@@ -86,9 +106,11 @@ class selunit:
         return self
 
     #open url
-    def open_url(self, url):
+    def inject_open_url(self, url):
         self.__browser.get(url)
         return self.wait_delay()
+    def open(self, url):
+        return self.inject_open_url(url)
 
     #window stats but not update window currently
     def set_scale(self, x:int, y:int):
@@ -123,7 +145,7 @@ class selunit:
         element:    WebElement = None
         ) -> Self:
         if url is not None:
-            self.open_url(url)
+            self.inject_open_url(url)
         if element is None:
             element = self.__browser.find_element(By.ID, 'sb_form_q')
         if element is None :
@@ -141,27 +163,37 @@ class selunit:
     def switch_to_parent(self) -> Self:
         self.__browser.switch_to.parent_frame()
         return self.wait_delay()
+    def switch_to_page(self, index:int) -> Self:
+        self.browser.switch_to.window(self.__browser.window_handles[index])
+        return self.wait_delay()
     def alert_accept(self) -> Self:
         self.__browser.switch_to.alert.accept()
         return self.wait_delay()
     def alert_dismiss(self) -> Self:
         self.__browser.switch_to.alert.dismiss()
         return self.wait_delay()
-    def screenshot(self, path:Optional[Union[str, tool_file]] = None):
-        self.__browser.get_screenshot_as_file("./screenshot.png" if path is None else Unwrapper2Str(path))
-        return self.wait_delay()
+    def screenshot(self, path:Union[str, tool_file] = "./screenshot.png") -> Self:
+        if is_loss_tool_file(path) is False:
+            self.__browser.get_screenshot_as_file(Unwrapper2Str(path))
+            return self.wait_delay()
+        else:
+            return self
 
     #seek for element
     def find_element(
             self,
             name:str,
-            typen:str) -> WebElement:
-        return self.__browser.find_element(typen,name)
+            typen:ByTypen) -> WebElement:
+        return self.browser.find_element(typen,name)
     def find_elements(
             self,
             name:str,
             typen:ByType) -> List[WebElement]:
         return self.__browser.find_elements(typen,name)
+    def find_name(self,name:str) -> WebElement:
+        return self.find_element(name,By.NAME)
+    def find_name_s(self,name:str) -> WebElement:
+        return self.find_elements(name,By.NAME)
     def find_class(self,name:str) -> WebElement:
         return self.find_element(name,By.CLASS_NAME)
     def find_xpath(self,name:str) -> WebElement:
@@ -176,19 +208,19 @@ class selunit:
         return self.find_element(name,By.CSS_SELECTOR)
     def find_id(self,name:str) -> WebElement:
         return self.find_element(name,By.ID)
-    def find_class_s(self,name:str) -> WebElement:
+    def find_class_s(self,name:str) -> List[WebElement]:
         return self.find_elements(name,By.CLASS_NAME)
-    def find_xpath_s(self,name:str) -> WebElement:
+    def find_xpath_s(self,name:str) -> List[WebElement]:
         return self.find_elements(name,By.XPATH)
-    def find_link_text_s(self,name:str) -> WebElement:
+    def find_link_text_s(self,name:str) -> List[WebElement]:
         return self.find_elements(name,By.LINK_TEXT)
-    def find_Partial_link_text_s(self,name:str) -> WebElement:
+    def find_partial_link_text_s(self,name:str) -> List[WebElement]:
         return self.find_elements(name,By.PARTIAL_LINK_TEXT)
-    def find_tag_s(self,name:str) -> WebElement:
+    def find_tag_s(self,name:str) -> List[WebElement]:
         return self.find_elements(name,By.TAG_NAME)
-    def find_css_s(self,name:str) -> WebElement:
+    def find_css_s(self,name:str) -> List[WebElement]:
         return self.find_elements(name,By.CSS_SELECTOR)
-    def find_id_s(self,name:str) -> WebElement:
+    def find_id_s(self,name:str) -> List[WebElement]:
         return self.find_elements(name,By.ID)
     def is_display(self, element:WebElement) -> bool:
         return element.is_displayed()
@@ -196,6 +228,14 @@ class selunit:
         return element.is_enabled()
     def is_select(self, element:WebElement) -> bool:
         return element.is_selected()
+
+    # toolkit of find
+    def find_password(self) -> List[WebElement]:
+        return self.find_xpath_s("//*[(@password or @pwd)]")
+    def find_username(self) -> List[WebElement]:
+        return self.find_xpath_s("//*[(@username or @user or @email or @phone or @tel)]")
+    def find_text(self) -> List[WebElement]:
+        return self.find_xpath_s("//*[(@text or @value or @placeholder or @title)]")
 
     #current page operator
     def refresh(self):
@@ -207,6 +247,8 @@ class selunit:
     def backward(self):
         self.__browser.back()
         return self.wait_delay()
+    def window_handles(self) -> List[str]:
+        return self.__browser.window_handles
 
     #get infomations
     def get_title(self) -> str:

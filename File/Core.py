@@ -679,6 +679,9 @@ class loss_file(tool_file):
 static_loss_file_dir = loss_file(".temp/")
 static_loss_file = loss_file(".temp.bad")
 
+def is_loss_tool_file(from_) -> bool:
+    return isinstance(from_, loss_file)
+
 def Wrapper(file) -> tool_file:
     if isinstance(file, tool_file):
         return file
