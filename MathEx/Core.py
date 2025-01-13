@@ -209,6 +209,13 @@ class left_np_ndarray_reference(left_number_reference):
         ) -> np.ndarray:
         return np.clip(self.ref_value, mini, maxi)
 
+    def __getitem__(self, *args, **kwargs) -> np.ndarray:
+        return self.ref_value.__getitem__(*args, **kwargs)
+    def __setitem__(self, *args, **kwargs):
+        return self.ref_value.__setitem__(*args, **kwargs)
+    def astype(self, typen) -> np.ndarray:
+        return self.ref_value.astype(typen)
+
     def __array__(self) -> np.ndarray:
         return self.ref_value
     def get_array(self) -> np.ndarray:
