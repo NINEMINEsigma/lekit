@@ -412,6 +412,13 @@ class ImageObject(left_np_ndarray_reference):
     def channel_depth(self) -> int:
         return self.shape[2]
 
+    @property
+    def pixel_count(self) -> int:
+        return self.image.size
+    @property
+    def dtype(self):
+        return self.image.dtype
+
     def is_enable(self):
         return self.image is not None
     def is_invalid(self):

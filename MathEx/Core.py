@@ -215,6 +215,9 @@ class left_np_ndarray_reference(left_number_reference[np.ndarray]):
         return self.ref_value.__setitem__(*args, **kwargs)
     def astype(self, typen) -> np.ndarray:
         return self.ref_value.astype(typen)
+    @property
+    def element_type(self):
+        return self.ref_value.dtype
 
     def __array__(self) -> np.ndarray:
         return self.ref_value
@@ -250,7 +253,6 @@ class left_np_ndarray_reference(left_number_reference[np.ndarray]):
     # np内容
     @property
     def shape(self) -> Tuple[int, ...]:
-        '''height, width, [depth(channels), ...]'''
         return self.ref_value.shape
     @property
     def element_count(self) -> int:
