@@ -403,19 +403,14 @@ class ImageObject(left_np_ndarray_reference):
         return self
 
     @property
-    def dimension(self) -> int:
-        return self.image.ndim
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        '''height, width, [depth, ...]'''
-        return self.image.shape
-    @property
     def height(self) -> int:
         return self.shape[0]
     @property
     def width(self) -> int:
         return self.shape[1]
+    @property
+    def channel_depth(self) -> int:
+        return self.shape[2]
 
     def is_enable(self):
         return self.image is not None
@@ -1176,6 +1171,8 @@ class ImageObject(left_np_ndarray_reference):
 
         # 返回绘制了方框的结果
         return result
+
+    # np加速
 
 def get_new_noise(
     raw_image:  Optional[MatLike],

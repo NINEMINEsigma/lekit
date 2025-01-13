@@ -32,7 +32,7 @@ NumberTypeOf_Float_Int_And_More = Union[
     np.ndarray
 ]
 NumberLike              = NumberTypeOf_Float_Int_And_More
-class left_number_reference(left_value_reference[NumberLike]):
+class left_number_reference[_T:NumberLike](left_value_reference[_T]):
     def __init__(self, ref_value:NumberLike):
         super().__init__(ref_value)
     def is_array(self):
@@ -184,7 +184,7 @@ def Wrapper2Lvn(value:Union[
     if isinstance(target, (left_value_reference, right_value_refenence)):
         target = target.ref_value
     return left_number_reference(target)
-class left_np_ndarray_reference(left_number_reference):
+class left_np_ndarray_reference(left_number_reference[np.ndarray]):
     '''
     针对np.ndarray的特化引用:
         将np.ndarray操作封装为面向对象的形式
@@ -242,6 +242,23 @@ class left_np_ndarray_reference(left_number_reference):
         return (self.ref_value-mini)/(maxi- mini)*255
     def standardize(self, mean, std) -> np.ndarray:
         return (self.ref_value-mean)/std
+    # np加速
+    def item(self, *args:SupportsIndex):
+        return self.ref_value.item(*args)
+    def item_set(self, value, *args:SupportsIndex):
+        self.ref_value.itemset(args, value)
+    # np内容
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        '''height, width, [depth(channels), ...]'''
+        return self.ref_value.shape
+    @property
+    def element_count(self) -> int:
+        return self.ref_value.size
+    @property
+    def dimension(self) -> int:
+        return self.ref_value.ndim
+
 def Wrapper2Lvnp(
     value:  Union[
         NumberLike,
