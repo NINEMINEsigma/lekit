@@ -698,6 +698,8 @@ def split_elements(
     output_must_exist:  bool                                        = True,
     output_callback:    Optional[Callable[[tool_file], None]]       = None
     ) -> List[List[tool_file]]:
+    if is_loss_tool_file(file):
+        return []
     result:                 List[List[tool_file]]   = BaseClass.split_elements(Wrapper(file).dir_tool_file_iter(),
                                       ratios=ratios,
                                       pr=pr,

@@ -93,6 +93,8 @@ class base_value_reference[_T](type_class):
         super().__init__()
         self._reinit_ref_value(ref_value)
     def _reinit_ref_value(self, value):
+        if isinstance(value, base_value_reference):
+            value = value._ref_value
         self._ref_value = value
         self.__real_type = type(value)
     def _clear_ref_value(self):

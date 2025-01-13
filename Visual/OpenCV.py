@@ -3,11 +3,9 @@ from lekit.Internal     import *
 
 import cv2              as     base
 import cv2.data         as     BaseData
-from cv2.typing         import *
-import numpy            as     np
+from lekit.MathEx.Core  import *
 from PIL                import ImageFile, Image
 
-from lekit.MathEx.Core  import *
 from lekit.Str.Core     import UnWrapper as Unwrapper2Str
 from lekit.File.Core    import tool_file, Wrapper as Wrapper2File, tool_file_or_str, loss_file
 

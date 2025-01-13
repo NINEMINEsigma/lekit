@@ -176,14 +176,14 @@ class left_number_reference(left_value_reference[NumberLike]):
         return np.bitwise_not(self.ref_value)
 def Wrapper2Lvn(value:Union[
     NumberLike,
-    left_number_reference,
-    left_value_reference[NumberLike],
-    right_value_refenence[NumberLike]
+    base_value_reference,
     ]) -> left_number_reference:
-    if isinstance(value, NumberLike):
-        return left_number_reference(value)
-    else:
-        return left_number_reference(value.ref_value)
+    if isinstance(value, left_number_reference):
+        return value
+    target = value
+    if isinstance(target, (left_value_reference, right_value_refenence)):
+        target = target.ref_value
+    return left_number_reference(target)
 class left_np_ndarray_reference(left_number_reference):
     '''
     针对np.ndarray的特化引用:
@@ -235,50 +235,92 @@ class left_np_ndarray_reference(left_number_reference):
         return (self.ref_value-mini)/(maxi- mini)*255
     def standardize(self, mean, std) -> np.ndarray:
         return (self.ref_value-mean)/std
-
-NumberInstanceOrContainer = Union[
-    NumberLike,
-    Sequence[NumberLike],
-    Dict[Any, NumberLike]
-]
+def Wrapper2Lvnp(
+    value:  Union[
+        NumberLike,
+        base_value_reference,
+        ]
+    ) -> left_np_ndarray_reference:
+    if isinstance(value, left_np_ndarray_reference):
+        return value
+    target = value
+    if isinstance(target, (left_value_reference, right_value_refenence)):
+        target = target.ref_value
+    if isinstance(target, np.ndarray) is False:
+        target = np.array(target)
+    return left_np_ndarray_reference(target)
 
 NumberInside = NumberLike
+NumberLike_or_lvNumber = Union[
+    NumberLike,
+    left_number_reference,
+]
+
+def UnwrapperLvn2Number(value:NumberLike_or_lvNumber):
+    if isinstance(value, left_number_reference):
+        return value.ref_value
+    return value
+
+def internal_max(*args):
+    result = args[0]
+    for item in args:
+        if result<item:
+            result = item
+    return result
+def internal_min(*args):
+    result = args[0]
+    for item in args:
+        if item<result:
+            result = item
+    return result
 
 def clamp_without_check(
-    value:  NumberLike,
-    left:   NumberLike,
-    right:  NumberLike
+    value:  NumberLike_or_lvNumber,
+    left:   NumberLike_or_lvNumber,
+    right:  NumberLike_or_lvNumber
     ) -> NumberLike:
-    return max(left, min(value, right))
+    return type(value)(internal_max(left, internal_min(value, right)))
 def clamp(
-    value:  NumberLike,
-    a:      NumberLike,
-    b:      NumberLike
+    value:  NumberLike_or_lvNumber,
+    a:      NumberLike_or_lvNumber,
+    b:      NumberLike_or_lvNumber
     ) -> NumberLike:
-    if a<b:
-        return clamp_without_check(value, a, b)
-    else:
-        return clamp_without_check(value, b, a)
+    if hasattr(value, "__lt__") is False:
+        return value
+    if a>b:
+        c = a
+        a = b
+        b = c
+    return clamp_without_check(value, b, a)
 def clamp_sequence(
-    values: Sequence[NumberLike],
-    a:      NumberLike,
-    b:      NumberLike
+    values: Sequence[NumberLike_or_lvNumber],
+    a:      NumberLike_or_lvNumber,
+    b:      NumberLike_or_lvNumber
     ) -> Sequence[NumberLike]:
-    if a<b:
-        return [clamp_without_check(value, a, b) for value in values]
-    else:
-        return [clamp_without_check(value, b, a) for value in values]
+    if a>b:
+        c = a
+        a = b
+        b = c
+    return type(values)([clamp_without_check(value, a, b) for value in values])
 def clamp_dict(
-    values: Dict[Any, NumberLike],
+    values: Dict[Any, Union[
+        NumberLike,
+        left_number_reference
+    ]],
     a:      NumberLike,
     b:      NumberLike
-    ) -> Dict[str, NumberLike]:
-    if a<b:
-        return {key: clamp_without_check(value, a, b) for key, value in values.items()}
-    else:
-        return {key: clamp_without_check(value, b, a) for key, value in values.items()}
+    ) -> Dict[Any, NumberLike]:
+    if a>b:
+        c = a
+        a = b
+        b = c
+    return {key: clamp_without_check(value, b, a) for key, value in values.items()}
 def make_clamp(
-    value_or_values:    NumberInstanceOrContainer,
+    value_or_values:    Union[
+        NumberLike,
+        Sequence[NumberLike],
+        Dict[Any, NumberLike]
+    ],
     a:                  NumberLike,
     b:                  NumberLike
     ) -> Union[NumberLike, Sequence[NumberLike], Dict[str, NumberLike]]:
@@ -286,17 +328,15 @@ def make_clamp(
         return clamp(value_or_values, a, b)
     elif isinstance(value_or_values, Sequence):
         return clamp_sequence(value_or_values, a, b)
-    elif isinstance(value_or_values, Dict):
+    elif isinstance(value_or_values, dict):
         return clamp_dict(value_or_values, a, b)
     else:
         raise TypeError("value_or_values must be NumberLike, Sequence or Dict")
 
 NumberBetween01 = Union[float, NpFloatNumber]
 FloatBetween01 = float
-def clamp01(value: NumberLike) -> NumberBetween01:
+def clamp01[_T](value:_T) -> _T:
     return make_clamp(value, 0, 1)
-
-class shape_class(any_class):
 
 
 
