@@ -171,7 +171,7 @@ class tool_file(any_class):
             self.datas[self.__datas_lit_key] = None
         return self.__file
     def is_open(self)->bool:
-        return self.__file
+        return self.__file is not None
 
     def load(self):
         if self.__file_path is None:

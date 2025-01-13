@@ -24,6 +24,7 @@ wait_enable_type = Literal[
     implicitly_wait_enable_type
     ]
 type ByTypen = str
+type DriverOrElement = Union[WebDriver, WebElement]
 
 class selunit(any_class):
     """ instance of selenium functions """
@@ -35,6 +36,7 @@ class selunit(any_class):
             browser:    WebDriver   = None,
             transform:  abs_box     = Rect(int(50), int(50), int(900), int(800)),
             delay = 3):
+        super().__init__()
         if browser is None:
             browser = webdriver.Edge()
         self.__browser:                 WebDriver                           = browser
@@ -46,6 +48,10 @@ class selunit(any_class):
         self.current_select_element:    WebElement                          = None
     def __del__(self):
         self.browser.close()
+    @override
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.quit()
+        return super().__exit__(exc_type, exc_val, exc_tb)
 
     def get_browser(self) -> WebDriver:
         '''
@@ -322,7 +328,7 @@ class selunit(any_class):
         self.__browser.delete_cookie(name)
         return self
     def clear_cookies(self):
-        self.__browser.delete_all_cookies();
+        self.__browser.delete_all_cookies()
         return self
 
     #toolkits
@@ -340,18 +346,41 @@ class selunit(any_class):
         return self.wait_delay()
 
     #create if-wait task
-    def create_wait_task(self, timeout:int = -1, poll_freq:int = 0.5, ignored_exceptions: Optional[Iterable[Type[Exception]]] = None) -> WaitTask:
-        return WaitTask(self.__browser, self.get_delay()if timeout<=0 else timeout, poll_freq, ignored_exceptions)
-    DriverOrElement = TypeVar("DriverOrElement", bound=Union[WebDriver, WebElement])
-    WaitTaskT = TypeVar("WaitTaskT")
-    def wait_until(self, task:WaitTask, method: Callable[[DriverOrElement], Union[Literal[False], WaitTaskT]], message: str = "") -> WaitTaskT:
-        return task.until(method,message)
-    def until_find_element(self, task:WaitTask, name:str, typen:str = By.ID) -> WaitTaskT:
-        return self.wait_until(task,EC.presence_of_element_located(typen,name))
-    def wait_until_not(self, task:WaitTask, method: Callable[[DriverOrElement], WaitTaskT], message: str = "") -> Union[WaitTaskT, Literal[True]]:
-        return task.until_not(method,message)
-    def until_not_find_element(self, task:WaitTask, name:str, typen:str = By.ID) -> Union[WaitTaskT, Literal[True]]:
-        return self.wait_until_not(task,EC.presence_of_element_located(typen,name))
+    def create_wait_task(
+            self,
+            timeout:            int = -1,
+            poll_freq:          int = 0.5,
+            ignored_exceptions: Optional[Iterable[Type[Exception]]] = None
+            ) -> WaitTask:
+        return WaitTask(self.__browser, self.delay if timeout<=0 else timeout, poll_freq, ignored_exceptions)
+    def wait_until[_Element_or_False:Union[Literal[False], DriverOrElement]](
+            self,
+            task:               WaitTask, 
+            method:             Callable[[DriverOrElement], _Element_or_False], 
+            message:            str = ""
+            ) -> _Element_or_False:
+        return task.until(method, message)
+    def until_find_element(
+            self, 
+            task:               WaitTask, 
+            name:               str, 
+            typen:              str = By.ID
+            ) -> WebElement:
+        return self.wait_until(task, EC.presence_of_element_located((typen,name)))
+    def wait_until_not[_Element_or_True:Union[Literal[True], DriverOrElement]](
+            self, 
+            task:               WaitTask, 
+            method:             Callable[[DriverOrElement], _Element_or_True], 
+            message:            str = ""
+            ) -> _Element_or_True:
+        return task.until_not(method, message)
+    def until_not_find_element(
+            self, 
+            task:               WaitTask, 
+            name:               str, 
+            typen:              str = By.ID
+            ) -> WebElement:
+        return self.wait_until_not(task, EC.presence_of_element_located((typen,name)))
 
 class test_selunit(unittest.TestCase):
     def __init__(self, methodName: str = "runTest") -> None:

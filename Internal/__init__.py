@@ -1,6 +1,7 @@
 from types          import TracebackType
 from typing         import *
 from abc            import *
+import                     sys
 from pydantic       import BaseModel
 import                     threading
 import                     traceback
@@ -29,6 +30,9 @@ def InternalImportingThrow(
     ):
         requierds_str = ",".join([f"<{r}>" for r in requierds])
         print(f"Internal lekit package is not installed.\n{messageBase.format_map(dict(module=moduleName, required=requierds_str))}")
+
+false = False
+true = True
 
 type Typen[_T] = type
 
@@ -86,8 +90,11 @@ class type_class(ABC):
         exc_type:   Optional[type],
         exc_val:    Optional[BaseException],
         exc_tb:     Optional[TracebackType]
-        ) -> Optional[bool]:
-        return True
+        ) -> bool:
+        if exc_val is None:
+            return True
+        else:
+            return False
 class base_value_reference[_T](type_class):
     def __init__(self, ref_value:_T):
         super().__init__()
@@ -157,8 +164,10 @@ class any_class(type_class, ABC):
     def Share[_T](self, out_value:left_value_reference[_T]) -> Self:
         if out_value is None:
             raise ValueError("out_value cannot be None")
-        if out_value.GetType()
-        out_value.ref_value = self
+        if isinstance(self, out_value.GetRealType()):
+            out_value.ref_value = self
+        else:
+            out_value.ref_value = out_value.GetRealType()(self)
         return self
 
 class null_package[_T](left_value_reference[_T]):

@@ -11,7 +11,7 @@ class light_bs(left_value_reference[base]):
     def __init__(
         self,
         markup:             Union[
-            str, bytes, bs4.SupportsRead[str], bs4.SupportsRead[bytes],
+            str, bytes, "bs4.SupportsRead[str]", "bs4.SupportsRead[bytes]",
             tool_file,
         ]                                       = "",
         features:           Optional[Union[
@@ -19,8 +19,8 @@ class light_bs(left_value_reference[base]):
             Sequence[str]
         ]]                                      = "html.parser",
         builder:            Optional[Union[
-            bs4.TreeBuilder,
-            type[bs4.TreeBuilder]
+            "bs4.TreeBuilder",
+            type["bs4.TreeBuilder"]
         ]]                                      = None,
         parse_only:         Optional[
             bs4.SoupStrainer
@@ -30,7 +30,7 @@ class light_bs(left_value_reference[base]):
             Sequence[str]
         ]                                       = None,
         element_classes:    Optional[Dict[
-            type[bs4.PageElement], type[Any]
+            type["bs4.PageElement"], type[Any]
         ]]                                      = None,
         **kwargs
         ):

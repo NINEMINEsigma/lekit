@@ -1,29 +1,10 @@
 from typing             import *
 from lekit.File.Core    import tool_file, tool_file_or_str, Wrapper as Wrapper2File
 from lekit.Str.Core     import UnWrapper as Unwrapper2Str
-
 import os
-
-try:
-    import numpy as np
-except ImportError:
-    pass
-
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    pass
-
-try:
-    import pandas as pd
-except ImportError:
-    pass
-
-try:
-    from PIL import Image as PILImage
-    from PIL import ImageDraw as PILImageDraw
-except ImportError:
-    pass
+import numpy as np
+import pandas as pd
+import pydantic
 
 const_config_file = "config.json"
 
