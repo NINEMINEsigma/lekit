@@ -16,6 +16,34 @@ type_symbols = {
     'NoneType' : type(None),
     }
 
+def get_type_from_string(type_string:str):
+        """根据字符串生成类型"""
+        if type_string in type_symbols:
+            return type_symbols[type_string]
+
+        # 首先尝试从内置类型中获取
+        if type_string in dir(types):
+            return getattr(types, type_string)
+        # 首先尝试从内置类型中获取
+        elif type_string in globals():
+            return globals()[type_string]
+        # 尝试从当前模块中获取
+        elif type_string in dir(__import__(__name__)):
+            return getattr(__import__(__name__), type_string)
+        # 尝试从标准库中获取
+        else:
+            try:
+                if '.' not in type_string:
+                    raise ValueError(f"Empty module name, type_string is {type_string}")
+                module_name, _, class_name = type_string.rpartition('.')
+                if not module_name:
+                    raise ValueError(f"Empty module name, type_string is {type_string}")
+                module = importlib.import_module(module_name)
+                return getattr(module, class_name)
+            except (ImportError, AttributeError, ValueError) as e:
+                raise TypeError(f"Cannot find type '{type_string}', type_string is {type_string}") from e
+
+
 class light_reflection(any_class):
     def __init__(self, obj:object, type_str:str=None, *args, **kwargs):
         if obj is not None:
@@ -71,43 +99,15 @@ class light_reflection(any_class):
     def get(self, field:str):
         return self.get_attribute(field)
 
-    def get_type_from_string(self, type_string:str):
-        """根据字符串生成类型"""
-        if type_string in type_symbols:
-            return type_symbols[type_string]
-
-        # 首先尝试从内置类型中获取
-        if type_string in dir(types):
-            return getattr(types, type_string)
-        # 首先尝试从内置类型中获取
-        elif type_string in globals():
-            return globals()[type_string]
-        # 尝试从当前模块中获取
-        elif type_string in dir(__import__(__name__)):
-            return getattr(__import__(__name__), type_string)
-        # 尝试从标准库中获取
-        else:
-            try:
-                if '.' not in type_string:
-                    raise ValueError(f"Empty module name, type_string is {type_string}")
-                module_name, _, class_name = type_string.rpartition('.')
-                if not module_name:
-                    raise ValueError(f"Empty module name, type_string is {type_string}")
-                module = importlib.import_module(module_name)
-                return getattr(module, class_name)
-            except (ImportError, AttributeError, ValueError) as e:
-                raise TypeError(f"Cannot find type '{type_string}', type_string is {type_string}") from e
-
-
     def create_instance(self, type_string:str, *args, **kwargs):
         """根据类型字符串生成类型的实例"""
-        type_ = self.get_type_from_string(type_string)
+        type_ = get_type_from_string(type_string)
         return type_(*args, **kwargs)
 
     def create_instance_ex(self, type_string:str, params: Union[Dict[str,object], object]={}):
         """根据类型字符串生成类型的实例"""
 
-        typen = self.get_type_from_string(type_string)
+        typen = get_type_from_string(type_string)
         if type_string in type_symbols:
             return typen(params)
         if params is None or len(params) == 0:

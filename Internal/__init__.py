@@ -104,6 +104,10 @@ class base_value_reference[_T](type_class):
             value = value._ref_value
         self._ref_value = value
         self.__real_type = type(value)
+    def __getattr__(self, name):
+        return self._ref_value.__getattribute__(name)
+    def __setattr__(self, name, value):
+        self._ref_value.__setattr__(name, value)
     def _clear_ref_value(self):
         self._ref_value = None
     @override
@@ -169,6 +173,15 @@ class any_class(type_class, ABC):
         else:
             out_value.ref_value = out_value.GetRealType()(self)
         return self
+
+def UnwrapperInstance2Ref[_T](instance:Union[
+    _T,
+    base_value_reference
+    ]) -> _T:
+    if isinstance(instance, base_value_reference):
+        return instance.ref_value
+    else:
+        return instance
 
 class null_package[_T](left_value_reference[_T]):
     @override
@@ -439,8 +452,7 @@ def create_py_file(path:str):
         f.write(f"if __name__ == \"__main__\":\n")
         f.write("\trun()\n")
 
-_TargetType = TypeVar("TargetType")
-def WrapperConfig2Instance(
+def WrapperConfig2Instance[_TargetType](
     typen_or_generater:             Union[type, Callable[[Any], _TargetType]],
     datahead_of_config_or_instance: Optional[Union[
             Dict[str, Any], # kwargs
