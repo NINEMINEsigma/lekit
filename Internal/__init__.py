@@ -45,6 +45,17 @@ def dynamic_cast[_T](typen:Typen[_T], from_) -> Optional[_T]:
 def reinterpret_cast[_T](typen:Typen[_T], from_) -> _T:
     raise NotImplementedError("Python does not support reinterpret_cast anyways")
 
+def any_if[_T](iter:Iterator[_T], pr:Callable[[_T], bool]) -> bool:
+    for i in iter:
+        if pr(i):
+            return True
+    return False
+def all_if[_T](iter:Iterator[_T], pr:Callable[[_T], bool]) -> bool:
+    for i in iter:
+        if not pr(i):
+            return False
+    return True
+
 type Action[_T] = Callable[[_T], None]
 type Action2[_T1, _T2] = Callable[[_T1, _T2], None]
 type Action3[_T1, _T2, _T3] = Callable[[_T1, _T2, _T3], None]
@@ -311,25 +322,36 @@ class out_value_reader[_T](right_value_refenence[_T]):
             super().__init__(None)
 
 # using as c#: event
-class ActionEvent(invoke_callable):
-    def __init__(self, actions:Sequence[Callable]):
+class ActionEvent[_Call:Callable](invoke_callable):
+    def __init__(self, actions:Sequence[_Call]):
         super().__init__()
-        self.__actions:List[Callable]   = [action for action in actions]
-        self.call_indexs:List[int]      = [i for i in range(len(actions))]
-    def __inject_invoke(self, *args, **kwargs):
+        self.__actions:     List[Callable]  = [action for action in actions]
+        self.call_indexs:   List[int]       = [i for i in range(len(actions))]
+        self.last_result:   List[Any]       = []
+    def call_func(self, index:int, *args, **kwargs) -> Union[Any, Exception]:
+        try:
+            return self.__actions[index](*args, **kwargs)
+        except Exception as ex:
+            return ex
+    def _inject_invoke(self, *args, **kwargs):
+        result:List[Any] = []
         for index in self.call_indexs:
-            self.__actions[index](*args, **kwargs)
+            result.append(self.call_func(index, *args, **kwargs))
+        return result
+    def invoke(self, *args, **kwargs) -> Union[Self, bool]:
+        self.last_result = self._inject_invoke(*args, **kwargs)
+        return self
     def init_call_index(self):
         self.call_indexs = [i for i in range(len(self.__actions))]
-    def add_action(self, action:Callable):
+    def add_action(self, action:_Call):
         self.__actions.append(action)
         self.call_indexs.append(len(self.__actions)-1)
         return self
-    def add_actions(self, actions:Sequence[Callable]):
+    def add_actions(self, actions:Sequence[_Call]):
         for action in actions:
             self.add_action(action)
         return self
-    def __internal_remove_action(self, action:Callable):
+    def _internal_remove_action(self, action:_Call):
         if action in self.__actions:
             index = self.__actions.index(action)
             self.__actions.remove(action)
@@ -339,10 +361,15 @@ class ActionEvent(invoke_callable):
                     self.call_indexs[i] -= 1
             return True
         return False
-    def remove_action(self, action:Callable):
-        while self.__internal_remove_action(action):
+    def remove_action(self, action:_Call):
+        while self._internal_remove_action(action):
             pass
         return self
+
+    def is_valid(self):
+        return not any_if(self.last_result, lambda x: isinstance(x, Exception))
+    def __bool__(self):
+        return self.is_valid()
 
 # region instance
 
@@ -487,9 +514,9 @@ def remove_none_value[_T:Union[
         return type(data)(v for v in data if v is not None)
     else:
         raise ValueError(f"remove_none_value not support this type<{type(data)}>")
-def to_list[_DataTy, _T:Sequence[_DataTy]](data:_T) -> _T:
+def to_list[_DataTy, _T:Sequence[_DataTy]](data:_T) -> List[_DataTy]:
     return data if isinstance(data, list) else list(data)
-def to_tuple[_DataTy, _T:Sequence[_DataTy]](data:_T) -> _T:
+def to_tuple[_DataTy, _T:Sequence[_DataTy]](data:_T) -> Tuple[_DataTy, ...]:
     return data if isinstance(data, tuple) else tuple(data)
 
 if __name__ == "__main__":

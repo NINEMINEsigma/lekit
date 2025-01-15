@@ -74,8 +74,8 @@ class basic_unit_interface[_T:DriverOrElement](left_value_reference[_T]):
             name:str,
             typen:ByType) -> List[Self[WebElement]]:
         return [
-            basic_unit_interface[WebElement](element) 
-            for element 
+            basic_unit_interface[WebElement](element)
+            for element
             in self.ref_value.find_elements(typen,name)
             ]
     def find_name(self,name:str):
@@ -188,7 +188,7 @@ class selunit(basic_unit_interface[WebDriver]):
 
     # toolkit of wait
     def make_wait_task(
-            self, 
+            self,
             timeout:    float = 10,
             ) -> WaitTask:
         return WaitTask(self.browser, timeout)
@@ -437,29 +437,29 @@ class selunit(basic_unit_interface[WebDriver]):
         return WaitTask(self.ref_value, self.delay if timeout<=0 else timeout, poll_freq, ignored_exceptions)
     def wait_until[_Element_or_False:Union[Literal[False], DriverOrElement]](
             self,
-            task:               WaitTask, 
-            method:             Callable[[DriverOrElement], _Element_or_False], 
+            task:               WaitTask,
+            method:             Callable[[DriverOrElement], _Element_or_False],
             message:            str = ""
             ) -> _Element_or_False:
         return task.until(method, message)
     def until_find_element(
-            self, 
-            task:               WaitTask, 
-            name:               str, 
+            self,
+            task:               WaitTask,
+            name:               str,
             typen:              str = By.ID
             ) -> WebElement:
         return self.wait_until(task, EC.presence_of_element_located((typen,name)))
     def wait_until_not[_Element_or_True:Union[Literal[True], DriverOrElement]](
-            self, 
-            task:               WaitTask, 
-            method:             Callable[[DriverOrElement], _Element_or_True], 
+            self,
+            task:               WaitTask,
+            method:             Callable[[DriverOrElement], _Element_or_True],
             message:            str = ""
             ) -> _Element_or_True:
         return task.until_not(method, message)
     def until_not_find_element(
-            self, 
-            task:               WaitTask, 
-            name:               str, 
+            self,
+            task:               WaitTask,
+            name:               str,
             typen:              str = By.ID
             ) -> WebElement:
         return self.wait_until_not(task, EC.presence_of_element_located((typen,name)))
@@ -486,23 +486,43 @@ class page_interface(left_value_reference[selunit], invoke_callable, ABC):
     def __init__(self, ref_value):
         super().__init__(ref_value)
 
-class page(page_interface, ABC):
+    @abstractmethod
+    def next_page(self) -> Self:
+        raise NotImplementedError("next_page is not implemented.")
+
+class page(page_interface, ActionEvent[Action[selunit]], ABC):
     def __init__(self, *actions:Action[selunit]) -> None:
         if selunit_instance is None:
            selunit_instance = __internal_build_up()
-        super().__init__(selunit_instance)
-        self.actions = actions
+        page_interface.__init__(self, selunit_instance)
+        ActionEvent[Action[selunit]].__init__(self, actions)
 
     @abstractmethod
     def inject_next_page(self) -> page_interface:
         """Injects the next page into the current page."""
         raise NotImplementedError("inject_next_page is not implemented.")
 
-    def next_page(self) -> Self:
+    @override
+    def next_page(self) -> page_interface:
         self.invoke()
         return self.inject_next_page()
-    
+
+    @override
+    def _inject_invoke(self):
+        result:List[Any] = []
+        for index in self.call_indexs:
+            try:
+                result.append(self.__actions[index]())
+            except Exception as ex:
+                result.append(ex)
+        return result
     def invoke(self) -> Self:
         print(f"{self.SymbolName()} is invoking...")
         for index in tqdm.tqdm(range(len(self.actions))):
             self.actions[index](self.ref_value)
+
+
+
+
+
+
