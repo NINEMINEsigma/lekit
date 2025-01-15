@@ -20,7 +20,8 @@ def ImportingThrow(
         for i in requierds:
             print(installBase.format_map({"name":i}))
         if ex:
-            raise ex
+            print(ex)
+            #raise ex
 
 def InternalImportingThrow(
     moduleName:     str,
@@ -194,6 +195,14 @@ def UnwrapperInstance2Ref[_T](instance:Union[
     else:
         return instance
 
+class invoke_callable(any_class):
+    def __init__(self):
+        super().__init__()
+    def __call__(self, *args, **kwargs):
+        if "invoke" in dir(self):
+            return self.invoke(*args, **kwargs)
+        else:
+            raise NotImplementedError(f"self<{self.SymbolName()}> invoke not implemented")
 class null_package[_T](left_value_reference[_T]):
     @override
     def __init__(self, ref_value:_T):
@@ -207,7 +216,7 @@ class null_package[_T](left_value_reference[_T]):
         if self.GetRealType() == typen:
             call(self.ref_value)
         return self
-class closures[_T](left_value_reference[_T]):
+class closures[_T](left_value_reference[_T], invoke_callable):
     @override
     def __init__(self, ref_value:_T, callback:Action[_T]):
         super().__init__(ref_value)
@@ -224,12 +233,7 @@ class release_closures[_T](closures[_T]):
         self.callback = callback
     def __del__(self):
         self.invoke()
-class invoke_callable(any_class):
-    def __call__(self, *args, **kwargs):
-        if "invoke" in dir(self):
-            return self.invoke(*args, **kwargs)
-        else:
-            raise NotImplementedError(f"self<{self.SymbolName()}> invoke not implemented")
+
 # LightDiagram::ld::instance<_Ty>
 class restructor_instance[_Ty](left_value_reference[_Ty]):
     def __init__(
@@ -328,14 +332,16 @@ class ActionEvent[_Call:Callable](invoke_callable):
         self.__actions:     List[Callable]  = [action for action in actions]
         self.call_indexs:   List[int]       = [i for i in range(len(actions))]
         self.last_result:   List[Any]       = []
-    def call_func(self, index:int, *args, **kwargs) -> Union[Any, Exception]:
+    def call_func_without_call_index_control(self, index:int, *args, **kwargs) -> Union[Any, Exception]:
         try:
             return self.__actions[index](*args, **kwargs)
         except Exception as ex:
             return ex
+    def call_func(self, index:int, *args, **kwargs) -> Union[Any, Exception]:
+        return self.call_func_without_call_index_control(self.call_indexs[index], *args, **kwargs)
     def _inject_invoke(self, *args, **kwargs):
         result:List[Any] = []
-        for index in self.call_indexs:
+        for index in range(self.call_max_count):
             result.append(self.call_func(index, *args, **kwargs))
         return result
     def invoke(self, *args, **kwargs) -> Union[Self, bool]:
@@ -370,6 +376,12 @@ class ActionEvent[_Call:Callable](invoke_callable):
         return not any_if(self.last_result, lambda x: isinstance(x, Exception))
     def __bool__(self):
         return self.is_valid()
+    @property
+    def call_max_count(self):
+        return len(self.call_indexs)
+    @property
+    def action_count(self):
+        return len(self.__actions)
 
 # region instance
 

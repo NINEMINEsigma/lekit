@@ -62,22 +62,24 @@ class basic_unit_interface[_T:DriverOrElement](left_value_reference[_T]):
         self.__inject_browser = browser
 
     #seek for element
-    def find_element(
-            self,
-            name:str,
-            typen:ByTypen) -> Self[WebElement]:
-        return basic_unit_interface[WebElement](
-            self.ref_value.find_element(typen,name)
-        )
     def find_elements(
             self,
             name:str,
-            typen:ByType) -> List[Self[WebElement]]:
+            typen:ByType):
         return [
-            basic_unit_interface[WebElement](element)
+            basic_unit_interface[WebElement](element, self.browser)
             for element
-            in self.ref_value.find_elements(typen,name)
+            in self.browser.find_elements(typen, name)
             ]
+    def find_element(
+            self,
+            name:str,
+            typen:ByTypen):
+        temp = self.browser.find_elements(typen, name)
+        if len(temp) == 0:
+            return None
+        else:
+            return basic_unit_interface[WebElement](temp[0], self.browser)
     def find_name(self,name:str):
         return self.find_element(name,By.NAME)
     def find_name_s(self,name:str):
@@ -88,27 +90,27 @@ class basic_unit_interface[_T:DriverOrElement](left_value_reference[_T]):
         return self.find_element(name,By.XPATH)
     def find_link_text(self,name:str):
         return self.find_element(name,By.LINK_TEXT)
-    def find_partial_link_text(self,name:str) -> WebElement:
+    def find_partial_link_text(self,name:str):
         return self.find_element(name,By.PARTIAL_LINK_TEXT)
-    def find_tag(self,name:str) -> WebElement:
+    def find_tag(self,name:str):
         return self.find_element(name,By.TAG_NAME)
-    def find_css(self,name:str) -> WebElement:
+    def find_css(self,name:str):
         return self.find_element(name,By.CSS_SELECTOR)
-    def find_id(self,name:str) -> WebElement:
+    def find_id(self,name:str):
         return self.find_element(name,By.ID)
-    def find_class_s(self,name:str) -> List[WebElement]:
+    def find_class_s(self,name:str):
         return self.find_elements(name,By.CLASS_NAME)
-    def find_xpath_s(self,name:str) -> List[WebElement]:
+    def find_xpath_s(self,name:str):
         return self.find_elements(name,By.XPATH)
-    def find_link_text_s(self,name:str) -> List[WebElement]:
+    def find_link_text_s(self,name:str):
         return self.find_elements(name,By.LINK_TEXT)
-    def find_partial_link_text_s(self,name:str) -> List[WebElement]:
+    def find_partial_link_text_s(self,name:str):
         return self.find_elements(name,By.PARTIAL_LINK_TEXT)
-    def find_tag_s(self,name:str) -> List[WebElement]:
+    def find_tag_s(self,name:str):
         return self.find_elements(name,By.TAG_NAME)
-    def find_css_s(self,name:str) -> List[WebElement]:
+    def find_css_s(self,name:str):
         return self.find_elements(name,By.CSS_SELECTOR)
-    def find_id_s(self,name:str) -> List[WebElement]:
+    def find_id_s(self,name:str):
         return self.find_elements(name,By.ID)
     def is_display(self, element:WebElement) -> bool:
         if element is None:
@@ -200,10 +202,10 @@ class selunit(basic_unit_interface[WebDriver]):
         return self
 
     #open url
-    def inject_open_url(self, url):
+    def inject_open_url(self, url:str):
         self.ref_value.get(url)
         return self.wait_delay()
-    def open(self, url):
+    def open(self, url:str):
         return self.inject_open_url(url)
 
     #window stats but not update window currently
@@ -274,7 +276,7 @@ class selunit(basic_unit_interface[WebDriver]):
             return self
 
     # toolkit of find
-    def find_password(self) -> List[WebElement]:
+    def find_password(self):
         result = self.find_xpath_s("//*[(@password or @pwd)]")
         result.extend(
             self.find_xpath_s(f"//*[{make_xpath_contains_s(
@@ -283,7 +285,7 @@ class selunit(basic_unit_interface[WebDriver]):
             )}]")
         )
         return result
-    def find_username(self) -> List[WebElement]:
+    def find_username(self):
         result = self.find_xpath_s("//*[(@username or @user or @email or @phone or @tel)]")
         result.extend(
             self.find_xpath_s(
@@ -296,7 +298,7 @@ class selunit(basic_unit_interface[WebDriver]):
                 )}]")
             )
         return result
-    def find_text(self) -> List[WebElement]:
+    def find_text(self):
         result = self.find_xpath_s("//*[(@text or @value or @placeholder or @title)]")
         result.extend(
             self.find_xpath_s(f"//*[{make_xpath_contains_s(
@@ -320,7 +322,7 @@ class selunit(basic_unit_interface[WebDriver]):
             result[0].click()
             return True
         return False
-    def find_anylike_with_xpath(self, name:str) -> List[WebElement]:
+    def find_anylike_with_xpath(self, name:str):
         result = self.find_xpath_s(f"//*[@{name}]")
         result.extend(
             self.find_xpath_s(f"//*[contains(@{name})]")
@@ -486,6 +488,10 @@ class page_interface(left_value_reference[selunit], invoke_callable, ABC):
     def __init__(self, ref_value):
         super().__init__(ref_value)
 
+    @property
+    def browser(self):
+        return self.ref_value
+
     @abstractmethod
     def next_page(self) -> Self:
         raise NotImplementedError("next_page is not implemented.")
@@ -504,22 +510,27 @@ class page(page_interface, ActionEvent[Action[selunit]], ABC):
 
     @override
     def next_page(self) -> page_interface:
-        self.invoke()
-        return self.inject_next_page()
+        if self.invoke():
+            return self.inject_next_page()
+        else:
+            for item in self.last_result:
+                if isinstance(item, Exception):
+                    print(item)
+            raise ValueError(f"Bad excpetion(s) had raised in actions<{self.SymbolName()}>.")
 
     @override
-    def _inject_invoke(self):
+    def _inject_invoke(self, *args, **kwargs):
         result:List[Any] = []
-        for index in self.call_indexs:
-            try:
-                result.append(self.__actions[index]())
-            except Exception as ex:
-                result.append(ex)
-        return result
-    def invoke(self) -> Self:
         print(f"{self.SymbolName()} is invoking...")
-        for index in tqdm.tqdm(range(len(self.actions))):
-            self.actions[index](self.ref_value)
+        for index in tqdm.tqdm(range(self.call_max_count)):
+            result.append(self.call_func(index, *args, **kwargs))
+        return result
+    @override
+    def invoke(self):
+        return super().invoke(self.browser)
+    @override
+    def __call__(self):
+        return self.invoke()
 
 
 
