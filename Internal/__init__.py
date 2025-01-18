@@ -7,6 +7,13 @@ import                     threading
 import                     traceback
 import                     datetime
 import                     platform
+if platform.system() == "Windows":
+    from colorama       import Fore as ConsoleFrontColor, Back as ConsoleBackgroundColor, Style as ConsoleStyle
+
+def print_colorful(color:str, *args, is_reset:bool=False):
+    print(color,*args)
+    if is_reset:
+        print(ConsoleStyle.RESET_ALL, end="")
 
 ImportingFailedSet:Set[str] = set()
 def ImportingThrow(
@@ -14,8 +21,8 @@ def ImportingThrow(
     moduleName:     str,
     requierds:      Sequence[str],
     *,
-    messageBase:    str = "{module} Module requires {required} package.",
-    installBase:    str = "\tpip install {name}"
+    messageBase:    str = ConsoleFrontColor.RED+"{module} Module requires {required} package."+ConsoleFrontColor.RESET,
+    installBase:    str = ConsoleFrontColor.GREEN+"\tpip install {name}"+ConsoleFrontColor.RESET
     ):
         requierds_str = ",".join([f"<{r}>" for r in requierds])
         print(messageBase.format_map(dict(module=moduleName, required=requierds_str)))
@@ -33,7 +40,7 @@ def InternalImportingThrow(
     moduleName:     str,
     requierds:      Sequence[str],
     *,
-    messageBase:    str = "{module} Module requires internal lekit package: {required}.",
+    messageBase:    str = ConsoleFrontColor.RED+"{module} Module requires internal lekit package: {required}."+ConsoleFrontColor.RESET,
     ):
         requierds_str = ",".join([f"<{r}>" for r in requierds])
         print(f"Internal lekit package is not installed.\n{messageBase.format_map(dict(module=moduleName, required=requierds_str))}")

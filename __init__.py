@@ -18,4 +18,4 @@ __version__ = "0.0.1"
 __author__ = "ninemine@qq.com"
 __license__ = "MIT"
 
-ImportingRequires()
+ReleaseFailed2Requirements()

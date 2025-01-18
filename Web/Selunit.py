@@ -556,7 +556,7 @@ def release_static_selunit_instance():
     finally:
         pass
 
-selunit_debugger_call:Action[str] = lambda x: print(x)
+selunit_debugger_call:Action[str] = lambda x: print_colorful(ConsoleFrontColor.GREEN,x,is_reset=True)
 def set_selunit_debugger_call(logger:Action[str]):
     global selunit_debugger_call
     selunit_debugger_call = logger
@@ -574,6 +574,9 @@ class page_interface(left_value_reference[selunit], ABC):
         raise NotImplementedError("next_page is not implemented.")
 
 class page(page_interface, ABC):
+    '''
+    通过继承page类，实现页面类，并实现inject_next_page方法，返回下一个页面类(或重新实现page_interface.next_page方法)
+    '''
     def __init__(self, *actions:Action[selunit]) -> None:
         global selunit_instance
         if selunit_instance is None:
@@ -586,6 +589,12 @@ class page(page_interface, ABC):
                 raise ValueError(f"action<{type(action)}> is not callable.")
             selunit_debugger_call(f"action<{type(action)}> is activate into page<{self.GetType()}>.")
             self.actions.append(action)
+        if len(self.actions) == 0:
+            for action in dir(self):
+                if action.startswith("page_"):
+                    action = getattr(self, action)
+                    if isinstance(action, Callable):
+                        self.actions.append(action)
 
     @abstractmethod
     def inject_next_page(self) -> page_interface:
@@ -610,12 +619,12 @@ class page(page_interface, ABC):
     def __call__(self):
         return self.invoke()
 
-def page_run(page:page_interface):
-    current = page
-    while current is not None:
-        current = current.next_page()
-        global selunit_instance
-        selunit_instance.wait_delay()
+def page_run(page:page_interface, *pages:page_interface):
+    global selunit_instance
+    for current in (page, *pages):
+        while current is not None:
+            current = current.next_page()
+            selunit_instance.wait_without_notify(1)
     selunit_debugger_call("all pages are invoked.")
 
 
