@@ -6,7 +6,9 @@ from pydantic       import BaseModel
 import                     threading
 import                     traceback
 import                     datetime
+import                     platform
 
+ImportingFailedSet:Set[str] = set()
 def ImportingThrow(
     ex:             ImportError,
     moduleName:     str,
@@ -15,14 +17,12 @@ def ImportingThrow(
     messageBase:    str = "{module} Module requires {required} package.",
     installBase:    str = "\tpip install {name}"
     ):
-        with open("requirements.txt", "a") as f:
-            f.write("\n".join(requierds)+"\n")
-        with open("requirements-install-command.txt", "w") as f:
-            f.write("pip install -r requirements.txt")
         requierds_str = ",".join([f"<{r}>" for r in requierds])
         print(messageBase.format_map(dict(module=moduleName, required=requierds_str)))
         print('Install it via command:')
         for i in requierds:
+            global ImportingFailedSet
+            ImportingFailedSet.add(i)
             install = installBase.format_map({"name":i})
             print(install)
         if ex:
@@ -37,6 +37,13 @@ def InternalImportingThrow(
     ):
         requierds_str = ",".join([f"<{r}>" for r in requierds])
         print(f"Internal lekit package is not installed.\n{messageBase.format_map(dict(module=moduleName, required=requierds_str))}")
+
+def ReleaseFailed2Requirements():
+    global ImportingFailedSet
+    if len(ImportingFailedSet) == 0:
+        return
+    with open("requirements.txt", 'w') as f:
+        f.write("\n".join(ImportingFailedSet))
 
 false = False
 true = True
