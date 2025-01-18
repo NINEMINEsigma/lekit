@@ -1,10 +1,7 @@
-from typing             import *
+from lekit.Internal     import *
+from lekit.Str.Core     import UnWrapper as Unwrapper2Str, fill_str
 from lekit.File.Core    import tool_file, tool_file_or_str, Wrapper as Wrapper2File
-from lekit.Str.Core     import UnWrapper as Unwrapper2Str
 import os
-import numpy as np
-import pandas as pd
-import pydantic
 
 const_config_file = "config.json"
 
@@ -15,7 +12,9 @@ def generate_empty_config_json(path:tool_file_or_str):
     file.save()
     return file
 
-class GlobalConfig:
+class GlobalConfig(any_class):
+    configLogging_tspace    = len("Property not found")
+
     def get_config_file(self):
         return self.data_dir|self.__const_config_file
 
@@ -23,18 +22,23 @@ class GlobalConfig:
     def config_file(self):
         return self.get_config_file()
 
-    def __init__(self, data_dir:Optional[Union[tool_file, str]]=None, is_try_create_data_dir:bool=False):
+    def __init__(
+            self,
+            data_dir:                   Optional[tool_file_or_str]  = None, 
+            is_try_create_data_dir:     bool                        = False,
+            load:                       bool                        = True,
+            ):
         # build up data folder
         if data_dir is None:
             data_dir = tool_file(os.path.abspath('.'))
         self.data_dir:tool_file = data_dir if isinstance(data_dir, tool_file) else tool_file(Unwrapper2Str(data_dir))
-        if self.data_dir.exists() is False:
-            if is_try_create_data_dir:
-                self.data_dir.try_create_parent_path()
-            else:
-                raise FileNotFoundError(f"Can't find data dir: {self.data_dir.get_dir()}")
         if self.data_dir.is_dir() is False:
             self.data_dir.back_to_parent_dir()
+        if self.data_dir.exists() is False:
+            if is_try_create_data_dir:
+                self.data_dir.must_exists_path()
+            else:
+                raise FileNotFoundError(f"Can't find data dir: {self.data_dir.get_dir()}")
         # build up init data file
         self.__data_pair:Dict[str, Any] = {}
         global const_config_file
@@ -42,7 +46,7 @@ class GlobalConfig:
         config_file = self.config_file
         if config_file.exists() is False:
             generate_empty_config_json(config_file)
-        else:
+        elif load:
             self.load_properties()
     def __del__(self):
         #self.save_properties()
@@ -107,24 +111,38 @@ class GlobalConfig:
         }
         config.save()
         return self
-    def load_properties(self):
+    def __internal_load_properties(self):
         config = self.config_file
         if config.exists() is False:
             self.__data_pair = {}
         else:
-            config.load_as_json()
+            config.load()
             if "properties" in config.data:
                 for property_name in config.data["properties"]:
                     self.__data_pair[property_name] = config.data["properties"][property_name]
             else:
                 raise ValueError("Can't find properties in config file")
         return self
+    def load_properties(self):
+        self.__internal_load_properties()
+        return self
 
     def print_source_pair(self):
         print(self.__data_pair)
 
-    def Log(self, message_type:str, message):
-        print(f"{message_type}: {Unwrapper2Str(message)}")
+    def get_log_file(self) -> tool_file:
+        return self.get_file(self.config_file.get_filename(True)+"_log.txt", True)
+    @property
+    def log_file(self) -> tool_file:
+        return self.get_log_file()
+    def Log(self, message_type:str, message:Union[str, Any]):
+        str_message_type = str(message_type)
+        self.configLogging_tspace = max(self.configLogging_tspace, len(str_message_type))
+        what = f"{fill_str(message_type, self.configLogging_tspace, side="center")}: {Unwrapper2Str(message)}"
+        print(what)
+        log = self.get_log_file()
+        log.open('a')
+        log.write(f"[{nowf()}]{what}\n")
         return self
     def LogMessage(self, message:str):
         self.Log("Message", message)
@@ -142,12 +160,20 @@ class GlobalConfig:
         self.LogError("Please complete configuration")
         return self
 
+    def LogClear(self):
+        self.get_log_file().remove()
+        return self
+
     def FindItem(self, key:str):
         if key in self.__data_pair:
             return self.__data_pair[key]
         else:
             self.LogPropertyNotFound(key)
             return None
+
+class ProjectConfig(GlobalConfig):
+    def __init__(self, load=True):
+        super().__init__("Assets/", is_try_create_data_dir=True, load=load)
 
 if __name__ == "__main__":
     pass

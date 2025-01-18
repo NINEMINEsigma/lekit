@@ -5,6 +5,7 @@ import                     sys
 from pydantic       import BaseModel
 import                     threading
 import                     traceback
+import                     datetime
 
 def ImportingThrow(
     ex:             ImportError,
@@ -46,16 +47,48 @@ def dynamic_cast[_T](typen:Typen[_T], from_) -> Optional[_T]:
 def reinterpret_cast[_T](typen:Typen[_T], from_) -> _T:
     raise NotImplementedError("Python does not support reinterpret_cast anyways")
 
-def any_if[_T](iter:Iterator[_T], pr:Callable[[_T], bool]) -> bool:
+def any_if[_T](iter:Iterable[_T], pr:Callable[[_T], bool]) -> bool:
     for i in iter:
         if pr(i):
             return True
     return False
-def all_if[_T](iter:Iterator[_T], pr:Callable[[_T], bool]) -> bool:
+def all_if[_T](iter:Iterable[_T], pr:Callable[[_T], bool]) -> bool:
     for i in iter:
         if not pr(i):
             return False
     return True
+
+def first_if[_T](
+        iter:       Iterable[_T],
+        pr:         Callable[[_T], bool],
+        default:    Optional[_T]            = None
+        ) -> Optional[_T]:
+    for i in iter:
+        if pr(i):
+            return i
+    return default
+def first_if_not[_T](
+        iter:       Iterable[_T],
+        pr:         Callable[[_T], bool],
+        default:    Optional[_T]            = None
+        ) -> Optional[_T]:
+    return first_if(iter, lambda x: not pr(x), default)
+
+def last_if[_T](
+        iter:       Iterable[_T],
+        pr:         Callable[[_T], bool],
+        default:    Optional[_T]            = None
+        ) -> Optional[_T]:
+    for i in reversed(iter):
+        if pr(i):
+            return i
+    return default
+def last_if_not[_T](
+        iter:       Iterable[_T],
+        pr:         Callable[[_T], bool],
+        default:    Optional[_T]            = None
+        ) -> Optional[_T]:
+    return last_if(iter, lambda x: not pr(x), default)
 
 type Action[_T] = Callable[[_T], None]
 type Action2[_T1, _T2] = Callable[[_T1, _T2], None]
@@ -69,6 +102,7 @@ def format_traceback_info():
     return ''.join(traceback.format_stack()[:-1])
 
 class type_class(ABC):
+    generate_trackback: str = None
     def __init__(self):
         self.generate_trackback = format_traceback_info()
     def GetType(self):
@@ -108,18 +142,24 @@ class type_class(ABC):
         else:
             return False
 class base_value_reference[_T](type_class):
+    _ref_value:     Optional[_T]        = None
+    __real_type:    Optional[type]      = None
     def __init__(self, ref_value:_T):
         super().__init__()
         self._reinit_ref_value(ref_value)
-    def _reinit_ref_value(self, value):
-        if isinstance(value, base_value_reference):
-            value = value._ref_value
+    def _reinit_ref_value(self, value:_T):
         self._ref_value = value
         self.__real_type = type(value)
-    def __getattr__(self, name):
-        return self._ref_value.__getattribute__(name)
-    def __setattr__(self, name, value):
-        self._ref_value.__setattr__(name, value)
+    #def __getattr__(self, name):
+    #    try:
+    #        return super().__getattr__(name)
+    #    except AttributeError:
+    #        return self._ref_value.__getattr__(name)
+    #def __setattr__(self, name, value):
+    #    try:
+    #        super().__setattr__(name, value)
+    #    except AttributeError:
+    #        self._ref_value.__setattr__(name, value)
     def _clear_ref_value(self):
         self._ref_value = None
     @override
@@ -136,14 +176,44 @@ class base_value_reference[_T](type_class):
             return "None"
         return str(self._ref_value)
 
+    @override
+    def AsRef[_T](self, typen:Typen[_T]) -> Optional[_T]:
+        '''
+        If ref_value is None, using base class AsRef,
+        If ref_value is drivered by typen, return ref_value,
+        Else dynamic_cast ref_value to typen or self to typen
+        '''
+        if self.GetRealType() == typen or isinstance(self._ref_value, typen):
+            return self._ref_value
+        result = super().AsRef(typen)
+        if result is None and self._ref_value is not None:
+            result = dynamic_cast(typen, self._ref_value)
+        return result
+    @override
+    def AsValue[_T](self, typen:Typen[_T]) -> _T:
+        if self.GetRealType() == typen or isinstance(self._ref_value, typen):
+            return self._ref_value
+        else:
+            return super().AsValue(typen)
+    @overload
+    def Is[_T](self, typen:Typen[_T]) -> bool:
+        return self.GetRealType() == typen or isinstance(self._ref_value, typen) or super().Is(typen)
+    @overload
+    def IfIam[_T](self, typen:Typen[_T], action:Action[_T]) -> Self:
+        if self.GetRealType() == typen or isinstance(self._ref_value, typen):
+            action(self._ref_value)
+        else:
+            action(self)
+        return self
+
     def __repr__(self):
         if self._ref_value is None:
-            return "None"
-        return repr(self._ref_value)
+            return f"{self.GetRealType()}<None>"
+        return f"{self.GetRealType()}&"
     def __str__(self):
         if self._ref_value is None:
             return "None"
-        return str(self._ref_value)
+        return f"{self._ref_value}"
 class left_value_reference[_T](base_value_reference):
     def __init__(self, ref_value:_T):
         super().__init__(ref_value)
@@ -371,7 +441,6 @@ class ActionEvent[_Call:Callable](invoke_callable):
         while self._internal_remove_action(action):
             pass
         return self
-
     def is_valid(self):
         return not any_if(self.last_result, lambda x: isinstance(x, Exception))
     def __bool__(self):
@@ -483,6 +552,7 @@ class atomic[_T](any_class):
 def create_py_file(path:str):
     with open(path, "w") as f:
         f.write("# -*- coding: utf-8 -*-\n")
+        f.write("from lekit import lazy\n")
         f.write("from lekit.lazy import *\n")
         f.write("\n")
         f.write("def run():\n")
@@ -517,6 +587,10 @@ def WrapperConfig2Instance[_TargetType](
     else:
         return typen_or_generater(datahead_of_config_or_instance, *args, **kwargs)
 
+def remove_same_value[_T:Union[
+        tuple, list
+    ]](data:_T) -> _T:
+    return type(data)(set(data))
 def remove_none_value[_T:Union[
         dict, tuple, list
     ]](data:_T) -> _T:
@@ -530,6 +604,13 @@ def to_list[_DataTy, _T:Sequence[_DataTy]](data:_T) -> List[_DataTy]:
     return data if isinstance(data, list) else list(data)
 def to_tuple[_DataTy, _T:Sequence[_DataTy]](data:_T) -> Tuple[_DataTy, ...]:
     return data if isinstance(data, tuple) else tuple(data)
+
+def nowf() -> str:
+    '''
+    printf now time to YYYY-MM-DD_HH-MM-SS format,
+    return: str
+    '''
+    return datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 if __name__ == "__main__":
     ref = left_value_reference[int](5.5)

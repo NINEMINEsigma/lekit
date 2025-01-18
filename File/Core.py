@@ -83,7 +83,7 @@ class tool_file(any_class):
     @override
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-        return True
+        return super().__exit__(exc_type, exc_val, exc_tb)
 
     def __or__(self, other):
         if other is None:
@@ -99,6 +99,9 @@ class tool_file(any_class):
         return Path(self.__file_path)
     def __Path__(self):
         return Path(self.__file_path)
+
+    def write(self, data:Union[str, bytes]):
+        self.__file.write(data)
 
     def create(self):
         if self.exists() == False:
@@ -138,7 +141,7 @@ class tool_file(any_class):
         if target_file.is_dir():
             target_file = target_file|self.get_filename()
         shutil.move(self.__file_path, UnWrapper(target_file))
-        self.__file_path = target_file.get_path()
+        self.__file_path = target_file.__file_path
         return self
     def rename(self, newpath:Union[Self, str]):
         if self.exists() is False:
@@ -288,7 +291,7 @@ class tool_file(any_class):
     def save_as_json(self, path:Optional[str]=None):
         path = path if path is not None else self.__file_path
         self.close()
-        with open('w', encoding='utf-8') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(self.data, f, indent=4)
         return self
     def save_as_csv(self, path:Optional[str]=None):

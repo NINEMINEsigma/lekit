@@ -26,7 +26,7 @@ wait_enable_type = Literal[
     if_wait_enable_type,
     implicitly_wait_enable_type
     ]
-type ByTypen = str
+type ByTypen = Union[str, ByType]
 type DriverOrElement = Union[WebDriver, WebElement]
 
 def make_xpath_contains(element:str, value:str) -> str:
@@ -124,9 +124,106 @@ class basic_unit_interface[_T:DriverOrElement](left_value_reference[_T]):
         if element is None:
             return False
         return element.is_selected()
+    
+    # toolkit of find
+    def find_password(self):
+        result = self.find_xpath_s("//*[(@password or @pwd)]")
+        result.extend(
+            self.find_xpath_s(f"//*[{make_xpath_contains_s(
+                    ("@*", "password"),
+                    ("@*", "pwd")
+            )}]")
+        )
+        result.extend(self.muti_find_elements("password"))
+        result.extend(self.muti_find_elements("pwd"))
+        result.extend(self.find_partial_link_text_s(r"密码"))
+        return remove_same_value(result)
+    def find_username(self):
+        result = self.find_xpath_s("//*[(@username or @user or @email or @phone or @tel)]")
+        result.extend(
+            self.find_xpath_s(
+                f"//*[{make_xpath_contains_s(
+                    ("@*", "username"),
+                    ("@*", "user"),
+                    ("@*", "email"),
+                    ("@*", "phone"),
+                    ("@*", "tel")
+                )}]")
+            )
+        result.extend(self.muti_find_elements("username"))
+        result.extend(self.muti_find_elements("user"))
+        result.extend(self.muti_find_elements("email"))
+        result.extend(self.muti_find_elements("phone"))
+        result.extend(self.muti_find_elements("tel"))
+        result.extend(self.find_partial_link_text_s(r"邮箱"))
+        result.extend(self.find_partial_link_text_s(r"手机"))
+        result.extend(self.find_partial_link_text_s(r"电话"))
+        result.extend(self.find_partial_link_text_s(r"用户名"))
+        result.extend(self.find_partial_link_text_s(r"账号"))
+        return remove_same_value(result)
+    def find_text(self):
+        result = self.find_xpath_s("//*[(@text or @value or @placeholder or @title)]")
+        result.extend(
+            self.find_xpath_s(f"//*[{make_xpath_contains_s(
+                    ("@*", "text"),
+                    ("@*", "value"),
+                    ("@*", "placeholder"),
+                    ("@*", "title")
+            )}]")
+        )
+        result.extend(self.muti_find_elements("text"))
+        result.extend(self.muti_find_elements("value"))
+        result.extend(self.muti_find_elements("placeholder"))
+        result.extend(self.muti_find_elements("title"))
+        return remove_same_value(result)
+    def find_login_element(self):
+        result = self.find_xpath_s("//*[(@login or @signIn or @confirm)]")
+        result.extend(
+            self.find_xpath_s(f"//*[{make_xpath_contains_s(
+                    ("@*", "login"),
+                    ("@*", "signIn"),
+                    ("@*", "confirm")
+            )}]")
+        )
+        result.extend(self.muti_find_elements("login"))
+        result.extend(self.muti_find_elements("signIn"))
+        result.extend(self.muti_find_elements("confirm"))
+        result.extend(self.find_partial_link_text_s(r"登录"))
+        result.extend(self.find_partial_link_text_s(r"确认"))
+        result.extend(self.find_partial_link_text_s(r"提交"))
+        result.extend(self.find_partial_link_text_s(r"注册"))
+        result.extend(self.find_partial_link_text_s(r"登入"))
+        result = remove_same_value(result)
+        return [item for item in result if item.ref_value.tag_name=="button"]
+    def find_anylike_with_xpath(self, name:str):
+        result = self.find_xpath_s(f"//*[@{name}]")
+        result.extend(
+            self.find_xpath_s(f"//*[{make_xpath_contains("*", name)}]")
+        )
+        result.extend(self.muti_find_elements(name))
+        return remove_same_value(result)
+
+    def muti_find_elements(self, name:str):
+        result:List[basic_unit_interface[WebElement]] = []
+        for by in [
+            By.NAME,
+            By.CLASS_NAME,
+            By.LINK_TEXT,
+            By.PARTIAL_LINK_TEXT,
+            By.TAG_NAME,
+            By.CSS_SELECTOR,
+            By.ID,
+        ]:
+            result.extend(self.find_elements(name, by))
+        return remove_same_value(result)
 
     def send_keys(self, messages:str):
         return self.ref_value.send_keys(messages)
+    def click(self):
+        if isinstance(self.ref_value, WebElement):
+            return self.ref_value.click()
+        else:
+            print("Warning: click on non-WebElement")
 
 class selunit(basic_unit_interface[WebDriver]):
     """ instance of selenium functions """
@@ -148,7 +245,7 @@ class selunit(basic_unit_interface[WebDriver]):
         self.__if_wait_pred:            Callable[[WebDriver,float],bool]    = None
         self.current_select_element:    WebElement                          = None
     def __del__(self):
-        self.browser.close()
+        self.browser.quit()
     @override
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.quit()
@@ -275,60 +372,6 @@ class selunit(basic_unit_interface[WebDriver]):
         else:
             return self
 
-    # toolkit of find
-    def find_password(self):
-        result = self.find_xpath_s("//*[(@password or @pwd)]")
-        result.extend(
-            self.find_xpath_s(f"//*[{make_xpath_contains_s(
-                    ("@*", "password"),
-                    ("@*", "pwd")
-            )}]")
-        )
-        return result
-    def find_username(self):
-        result = self.find_xpath_s("//*[(@username or @user or @email or @phone or @tel)]")
-        result.extend(
-            self.find_xpath_s(
-                f"//*[{make_xpath_contains_s(
-                    ("@*", "username"),
-                    ("@*", "user"),
-                    ("@*", "email"),
-                    ("@*", "phone"),
-                    ("@*", "tel")
-                )}]")
-            )
-        return result
-    def find_text(self):
-        result = self.find_xpath_s("//*[(@text or @value or @placeholder or @title)]")
-        result.extend(
-            self.find_xpath_s(f"//*[{make_xpath_contains_s(
-                    ("@*", "text"),
-                    ("@*", "value"),
-                    ("@*", "placeholder"),
-                    ("@*", "title")
-            )}]")
-        )
-        return result
-    def login(self) -> bool:
-        result = self.find_xpath_s("//*[(@login or @signIn or @confirm)]")
-        result.extend(
-            self.find_xpath_s(f"//*[{make_xpath_contains_s(
-                    ("@*", "login"),
-                    ("@*", "signIn"),
-                    ("@*", "confirm")
-            )}]")
-        )
-        if len(result) != 0:
-            result[0].click()
-            return True
-        return False
-    def find_anylike_with_xpath(self, name:str):
-        result = self.find_xpath_s(f"//*[@{name}]")
-        result.extend(
-            self.find_xpath_s(f"//*[contains(@{name})]")
-        )
-        return result
-
     #current page operator
     def refresh(self):
         self.ref_value.refresh()
@@ -364,7 +407,7 @@ class selunit(basic_unit_interface[WebDriver]):
         if self.__mouse_action is None:
             self.__mouse_action = Mouse(self.ref_value)
         return self.__mouse_action
-    def click(self,element:WebElement):
+    def mouse_click(self,element:WebElement):
         self.get_mouse_action().click(element)
         return self.wait_delay()
     def right_click(self,element:WebElement):
@@ -384,7 +427,18 @@ class selunit(basic_unit_interface[WebDriver]):
         return self.wait_delay()
 
     #select target element and set it current select
-    def select_element(self, element:WebElement):
+    def select_element(self, element:Union[
+            WebElement,
+            basic_unit_interface[WebElement],
+            List[WebElement],
+            List[basic_unit_interface[WebElement]]
+        ]):
+        if isinstance(element, list):
+            if len(element) == 0:
+                return self
+            element = element[0]
+        if isinstance(element, basic_unit_interface):
+            element = element.ref_value
         self.current_select_element = element
         return self
 
@@ -396,6 +450,16 @@ class selunit(basic_unit_interface[WebDriver]):
         for element in elements:
             element.send_keys(keys)
         return self.wait_delay()
+    @override
+    def click(self):
+        if self.current_select_element is not None:
+            try:
+                self.current_select_element.click()
+            except Exception as ex:
+                raise ValueError(f"current_select_element<{self.current_select_element}> is not clickable") from ex
+        else:
+            raise Exception("current_select_element is None")
+        return self
 
     #actions about cookie
     def get_cookie(self, name) -> Dict:
@@ -478,13 +542,26 @@ class test_selunit(left_value_reference[selunit], unittest.TestCase):
     def tearDown(self) -> None:
         self.browser.quit()
 
-selunit_instance:WebDriver = None
-__internal_build_up:Callable[[], selunit] = lambda: selunit()
+selunit_instance:selunit = None
+internal_build_up = left_value_reference[Callable[[], selunit]](lambda: selunit())
 def set_buildup_static_selunit_instance_func(func:Callable[[], selunit]):
-    global __internal_build_up
-    __internal_build_up = func
+    global internal_build_up
+    internal_build_up.ref_value = func
+def release_static_selunit_instance():
+    try:
+        global selunit_instance
+        selunit_instance.wait_without_notify(3)
+        selunit_instance.quit()
+        selunit_instance = None
+    finally:
+        pass
 
-class page_interface(left_value_reference[selunit], invoke_callable, ABC):
+selunit_debugger_call:Action[str] = lambda x: print(x)
+def set_selunit_debugger_call(logger:Action[str]):
+    global selunit_debugger_call
+    selunit_debugger_call = logger
+
+class page_interface(left_value_reference[selunit], ABC):
     def __init__(self, ref_value):
         super().__init__(ref_value)
 
@@ -493,46 +570,53 @@ class page_interface(left_value_reference[selunit], invoke_callable, ABC):
         return self.ref_value
 
     @abstractmethod
-    def next_page(self) -> Self:
+    def next_page(self) -> Optional[Self]:
         raise NotImplementedError("next_page is not implemented.")
 
-class page(page_interface, ActionEvent[Action[selunit]], ABC):
+class page(page_interface, ABC):
     def __init__(self, *actions:Action[selunit]) -> None:
+        global selunit_instance
         if selunit_instance is None:
-           selunit_instance = __internal_build_up()
-        page_interface.__init__(self, selunit_instance)
-        ActionEvent[Action[selunit]].__init__(self, actions)
+            global internal_build_up
+            selunit_instance = internal_build_up.ref_value()
+        super().__init__(selunit_instance)
+        self.actions:List[Action[selunit]] = []
+        for action in actions:
+            if isinstance(action, Callable) is False:
+                raise ValueError(f"action<{type(action)}> is not callable.")
+            selunit_debugger_call(f"action<{type(action)}> is activate into page<{self.GetType()}>.")
+            self.actions.append(action)
 
     @abstractmethod
     def inject_next_page(self) -> page_interface:
         """Injects the next page into the current page."""
         raise NotImplementedError("inject_next_page is not implemented.")
 
-    @override
     def next_page(self) -> page_interface:
-        if self.invoke():
+        try:
+            self.invoke()
             return self.inject_next_page()
-        else:
-            for item in self.last_result:
-                if isinstance(item, Exception):
-                    print(item)
-            raise ValueError(f"Bad excpetion(s) had raised in actions<{self.SymbolName()}>.")
+        except Exception as ex:
+            raise ValueError(f"error<{ex}> had raised in actions-caller<{self.SymbolName()}>.")
 
-    @override
-    def _inject_invoke(self, *args, **kwargs):
-        result:List[Any] = []
-        print(f"{self.SymbolName()} is invoking...")
-        for index in tqdm.tqdm(range(self.call_max_count)):
-            result.append(self.call_func(index, *args, **kwargs))
-        return result
-    @override
     def invoke(self):
-        return super().invoke(self.browser)
-    @override
+        if len(self.actions) == 0:
+            selunit_debugger_call(f"current page<{self.GetType()}> has no action to invoke.")
+            return None
+        selunit_debugger_call(f"current page<{self.GetType()}> is invoking...")
+        for index in tqdm.tqdm(range(len(self.actions))):
+            action = self.actions[index]
+            action(self.browser)
     def __call__(self):
         return self.invoke()
 
-
+def page_run(page:page_interface):
+    current = page
+    while current is not None:
+        current = current.next_page()
+        global selunit_instance
+        selunit_instance.wait_delay()
+    selunit_debugger_call("all pages are invoked.")
 
 
 

@@ -1,9 +1,8 @@
 from pathlib import Path
-from typing                         import *
+from lekit.Internal                 import *
 from lekit.Lang.Reflection          import light_reflection
-import                                     jieba
 
-def limit_str(data, max_length=50):
+def limit_str(data, max_length:int=50):
     s:str = data if data is str else str(data)
     if len(s) <= max_length:
         return s
@@ -16,6 +15,23 @@ def limit_str(data, max_length=50):
         # 截取头尾部分并连接
         return s[:head_length] + inside_str + s[-tail_length:]
 
+def fill_str(data, max_length:int=50, fill_char:str=" ", side:Literal["left", "right", "center"]="right"):
+    s:str = data if data is str else str(data)
+    char = fill_char[0]
+    if len(s) >= max_length:
+        return s
+    else:
+        if side == "left":
+            return s + char * (max_length - len(s))
+        elif side == "right":
+            return char * (max_length - len(s)) + s
+        elif side == "center":
+            left = (max_length - len(s)) // 2
+            right = max_length - len(s) - left
+            return char * left + s + char * right
+        else:
+            raise ValueError(f"Unsupported side: {side}")
+
 def link(symbol:str, strs:list):
     return symbol.join(strs)
 
@@ -25,61 +41,104 @@ def list_byte_to_list_string(lines:List[bytes], encoding='utf-8') -> List[str]:
 def list_byte_to_string(lines:List[bytes], encoding='utf-8') -> str:
     return "".join(list_byte_to_list_string(lines, encoding))
     
-class light_str:
+class light_str(left_value_reference[str]):
+    '''
+    Support some function for one target string
+    '''
     def __init__(self, s:Union[str, List[bytes]] = ""):
         if isinstance(s, str):
-            self._str = s
+            super().__init__(s)
         elif isinstance(s, list):
-            self._str = list_byte_to_string(s)  
-    
+            super().__init__(list_byte_to_string(s))
+        else:
+            raise TypeError(f"Unsupported type for light_str: {type(s)}")
+
+    @property
+    def content(self):
+        return self.ref_value
+    @content.setter
+    def content(self, value:str):
+        self.ref_value = value
+
+    @property
     def length(self):
-        return len(self._str)
+        return len(self.content)
+    def __len__(self):
+        return self.length()
     
-    def append(self, s):
-        self._str += s
+    def append(self, s:Union[str, Any]):
+        self.content += str(s)
     
     def clear(self):
-        self._str = ""
+        self.content = ""
     
-    def insert(self, pos, s):
-        if pos < 0 or pos > len(self._str):
+    def insert(self, pos:int, s:Union[str, Any]):
+        if pos < 0 or pos > self.length:
             raise IndexError("Position out of range")
-        self._str = self._str[:pos] + s + self._str[pos:]
+        self.content = self.content[:pos] + str(s) + self.content[pos:]
     
-    def erase(self, pos, length):
-        if pos < 0 or pos + length > len(self._str):
+    def erase(self, pos:int, length:int):
+        if pos < 0 or pos + length > self.length:
             raise IndexError("Position and length out of range")
-        self._str = self._str[:pos] + self._str[pos + length:]
+        self.content = self.content[:pos] + self.content[pos + length:]
     
-    def find(self, s, pos=0):
-        return self._str.find(s, pos)
+    def find(self, s:Union[str, Any], pos:int=0):
+        return self.content.find(str(s), pos)
     
-    def substr(self, pos, length):
-        if pos < 0 or pos + length > len(self._str):
+    def substr(self, pos:int, length:int):
+        if pos < 0 or pos + length > self.length:
             raise IndexError("Position and length out of range")
-        return self._str[pos:pos + length]
+        return self.content[pos:pos + length]
     
-    def replace(self, old, new):
-        self._str = self._str.replace(old, new)
+    def replace(self, old:Union[str, Any], new:Union[str, Any]):
+        self.content = self.content.replace(str(old), str(new))
     
-    def split(self, sep):
-        return self._str.split(sep)
+    def split(self, sep:Union[str, Any]):
+        return self.content.split(str(sep))
     
-    def join(self, seq):
-        return self._str.join(seq)
+    def join_by_me(self, seq:Sequence[Union[str, Any]]):
+        return self.content.join([str(item) for item in seq])
     
     def lower(self):
-        return self._str.lower()
+        return self.content.lower()
     
     def upper(self):
-        return self._str.upper()
+        return self.content.upper()
     
     def strip(self):
-        return self._str.strip()
+        return self.content.strip()
+    def lstrip(self):
+        return self.content.lstrip()
+    def rstrip(self):
+        return self.content.rstrip()
     
-    def __str__(self):
-        return self._str
+    def trim(self, *chars:str):
+        return self.content.strip(*chars)
+    def ltrim(self, *chars:str):
+        return self.content.lstrip(*chars)
+    def rtrim(self, *chars:str):
+        return self.content.rstrip(*chars)
 
+    def startswith(self, s:Union[str, Any]):
+        return self.content.startswith(str(s))
+    def endswith(self, s:Union[str, Any]):
+        return self.content.endswith(str(s))
+    def contains(self, s:Union[str, Any]):
+        return str(s) in self.content
+    def __contains__(self, s:Union[str, Any]):
+        return self.contains(s)
+    def is_empty(self):
+        return self.content is None or self.content == ""
+
+    def get_limit_str(self, length:int=50):
+        if length < 0:
+            raise ValueError("Length must be non-negative")
+        return limit_str(self.content, length)
+    def get_fill_str(self, length:int=50, fill:str=" ", side:str="right"):
+        if length < 0:
+            raise ValueError("Length must be non-negative")
+        return fill_str(self.content, length, fill, side)
+    
 static_is_enable_unwrapper_none2none = False
 def enable_unwrapper_none2none():
     global static_is_enable_unwrapper_none2none
@@ -137,13 +196,18 @@ def Combine(*args) -> str:
     else:
         for current in args:
             result += UnWrapper(current)
-    
-def word_segmentation(
-    sentence:   Union[str, light_str, Any], 
-    cut_all:    bool                    = False,
-    HMM:        bool                    = True,
-    use_paddle: bool                    = False
-    ) -> Sequence[Optional[Union[Any, str]]]:
-    return jieba.dt.cut(UnWrapper(sentence), cut_all=cut_all, HMM=HMM, use_paddle=use_paddle)
+
+try:
+    import                                     jieba
+    def word_segmentation(
+        sentence:   Union[str, light_str, Any], 
+        cut_all:    bool                    = False,
+        HMM:        bool                    = True,
+        use_paddle: bool                    = False
+        ) -> Sequence[Optional[Union[Any, str]]]:
+        return jieba.dt.cut(UnWrapper(sentence), cut_all=cut_all, HMM=HMM, use_paddle=use_paddle)
+except ImportError:
+    def word_segmentation(*args, **kwargs):
+        raise ValueError("jieba is not install")
     
     

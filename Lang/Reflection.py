@@ -26,7 +26,7 @@ def get_type_from_string(type_string:str):
             return getattr(types, type_string)
         # 首先尝试从内置类型中获取
         elif type_string in globals():
-            return globals()[type_string]
+            return globals().get(type_string)
         # 尝试从当前模块中获取
         elif type_string in dir(__import__(__name__)):
             return getattr(__import__(__name__), type_string)
@@ -40,8 +40,12 @@ def get_type_from_string(type_string:str):
                     raise ValueError(f"Empty module name, type_string is {type_string}")
                 module = importlib.import_module(module_name)
                 return getattr(module, class_name)
-            except (ImportError, AttributeError, ValueError) as e:
-                raise TypeError(f"Cannot find type '{type_string}', type_string is {type_string}") from e
+            except (ImportError, AttributeError, ValueError) as ex:
+                print("get_type_from_string failed.")
+                print("first check in:{}".format(dir(types)))
+                print("second check in:{}".format(globals()))
+                print("third check in:{}".format(dir(__import__(__name__))))
+                raise TypeError(f"Cannot find type '{type_string}', type_string is <{type_string}>") from ex
 
 
 class light_reflection(any_class):
