@@ -13,3 +13,9 @@ from lekit.Str import *
 from lekit.UI import *
 from lekit.Visual import *
 from lekit.Web import *
+
+__version__ = "0.0.1"
+__author__ = "ninemine@qq.com"
+__license__ = "MIT"
+
+ImportingRequires()

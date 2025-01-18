@@ -6,6 +6,9 @@ from pydantic       import BaseModel
 import                     threading
 import                     traceback
 import                     datetime
+import                     platform
+
+ImportingFailedSet:Set[str] = set()
 
 def ImportingThrow(
     ex:             ImportError,
@@ -19,10 +22,28 @@ def ImportingThrow(
         print(messageBase.format_map(dict(module=moduleName, required=requierds_str)))
         print('Install it via command:')
         for i in requierds:
-            print(installBase.format_map({"name":i}))
+            message = installBase.format_map({"name":i})
+            print(message)
+            global ImportingFailedSet
+            if i not in ImportingFailedSet:
+                ImportingFailedSet.add(i)
         if ex:
             print(ex)
             #raise ex
+        
+def ImportingRequires():
+    global ImportingFailedSet
+    if len(ImportingFailedSet) == 0:
+        return
+    with open("requirements.txt", 'w') as f:
+        for i in ImportingFailedSet:
+            f.write(f"{i}\n")
+    if platform.system() == "Windows":
+        with open("requirements_build.bat", 'w') as f:
+            f.write("pip install -r requirements.txt")
+    else:
+        with open("requirements_build.sh", 'w') as f:
+            f.write("pip install -r requirements.txt")
 
 def InternalImportingThrow(
     moduleName:     str,
