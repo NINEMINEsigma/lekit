@@ -10,8 +10,8 @@ import                     platform
 if platform.system() == "Windows":
     from colorama       import Fore as ConsoleFrontColor, Back as ConsoleBackgroundColor, Style as ConsoleStyle
 
-def print_colorful(color:str, *args, is_reset:bool=False):
-    print(color,*args)
+def print_colorful(color:str, *args, is_reset:bool=False, **kwargs):
+    print(color,*args, **kwargs)
     if is_reset:
         print(ConsoleStyle.RESET_ALL, end="")
 
@@ -252,17 +252,17 @@ class left_value_reference[_T](base_value_reference):
         return self._ref_value is not None
     def is_empty(self):
         return self._ref_value is None
-class right_value_refenence[_T](type_class):
+class right_value_refenence[_T](base_value_reference):
     def __init__(self, ref_value:_T):
         super().__init__(ref_value)
     @property
     def ref_value(self) -> _T:
-        result = self.__ref_value
-        self.__ref_value = None
+        result = self._ref_value
+        self._ref_value = None
         return result
     @property
     def const_ref_value(self) -> _T:
-        return self.__ref_value
+        return self._ref_value
 class any_class(type_class, ABC):
     def __init__(self):
         super().__init__()

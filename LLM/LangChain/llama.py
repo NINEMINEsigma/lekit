@@ -34,7 +34,14 @@ def make_assistant_prompt(message:str):
 
 # Core Region
 
-class light_llama_core(abs_llm_core):
+class light_llama_core(left_value_reference[ChatLlamaCpp], abs_llm_core):
+    @property
+    def model(self) -> ChatLlamaCpp:
+        return self.ref_value
+    @model.setter
+    def model(self, value:ChatLlamaCpp):
+        self.ref_value = value
+    
     def __init__(self,
                  model:         Union[str, tool_file, ChatLlamaCpp],
                  init_message:  Union[MessageObject, List[MessageObject]]   = [],
@@ -50,9 +57,9 @@ class light_llama_core(abs_llm_core):
                 init_message = [init_message]
         if isinstance(model, ChatLlamaCpp) is False:
             model = ChatLlamaCpp(model_path=UnWrapper(model), temperature=temperature, *args, **kwargs)
+        super().__init__(model)
         self.init_message_list      :List[MessageObject]    = init_message
         self.hestroy_message_list   :List[MessageObject]    = self.init_message_list.copy()
-        self.model                  :ChatLlamaCpp           = model
         self.last_result            :BaseMessage            = None
         self.is_record_result_to_history:bool               = is_record_result_to_history
 

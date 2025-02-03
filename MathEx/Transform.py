@@ -274,7 +274,7 @@ RectBasicLike = Union[
 
 class Rect:
     def __init__(self, x: float, y: float, w: float, h: float):
-        self.__inject_array = np.ndarray([x, y, w, h])
+        self.__inject_array = np.array([x, y, w, h])
 
     @property
     def x(self):

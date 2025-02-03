@@ -787,7 +787,7 @@ def make_bulleted_tex(
         buff=buff,dot_scale_factor=dot_scale_factor,tex_environment=tex_environment,
         **kwargs)
 def make_title(
-        *text_parts,
+        *text_parts:                    str,
         include_underline:              bool = True,
         match_underline_width_to_text:  bool = False,
         underline_buff:                 bool = base.MED_SMALL_BUFF,

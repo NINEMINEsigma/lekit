@@ -13,7 +13,8 @@ def generate_empty_config_json(path:tool_file_or_str):
     return file
 
 class GlobalConfig(any_class):
-    configLogging_tspace    = len("Property not found")
+    configLogging_tspace:   int         = len("Property not found")
+    print_func:             Action[str] = print
 
     def get_config_file(self):
         return self.data_dir|self.__const_config_file
@@ -139,7 +140,7 @@ class GlobalConfig(any_class):
         str_message_type = str(message_type)
         self.configLogging_tspace = max(self.configLogging_tspace, len(str_message_type))
         what = f"{fill_str(message_type, self.configLogging_tspace, side="center")}: {Unwrapper2Str(message)}"
-        print(what)
+        self.print_func(what)
         log = self.get_log_file()
         log.open('a')
         log.write(f"[{nowf()}]{what}\n")

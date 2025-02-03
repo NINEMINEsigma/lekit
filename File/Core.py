@@ -124,7 +124,9 @@ class tool_file(any_class):
             else:
                 os.remove(self.__file_path)
         return self
-    def copy(self, to_path:Union[Self, str]):
+    def copy(self, to_path:Optional[Union[Self, str]]=None):
+        if to_path is None:
+            return tool_file(self.__file_path)
         if self.exists() is False:
             raise FileNotFoundError("file not found")
         self.close()
