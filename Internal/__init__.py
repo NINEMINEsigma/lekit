@@ -11,9 +11,10 @@ if platform.system() == "Windows":
     from colorama       import Fore as ConsoleFrontColor, Back as ConsoleBackgroundColor, Style as ConsoleStyle
 
 def print_colorful(color:str, *args, is_reset:bool=False, **kwargs):
-    print(color,*args, **kwargs)
     if is_reset:
-        print(ConsoleStyle.RESET_ALL, end="")
+        print(color,*args,ConsoleStyle.RESET_ALL, **kwargs)
+    else:
+        print(color,*args, **kwargs)
 
 ImportingFailedSet:Set[str] = set()
 def ImportingThrow(
@@ -51,6 +52,13 @@ def ReleaseFailed2Requirements():
         return
     with open("requirements.txt", 'w') as f:
         f.write("\n".join(ImportingFailedSet))
+
+def virtual(func:Callable) -> Callable:
+    try:
+        func.__is_virtual__ = True
+    except:
+        pass
+    return func
 
 false = False
 true = True
@@ -120,14 +128,16 @@ type ClosuresCallable[_T] = Union[Callable[[Optional[None]], _T], Typen[_T]]
 def format_traceback_info():
     return ''.join(traceback.format_stack()[:-1])
 
-class type_class(ABC):
+class type_class:
     generate_trackback: str = None
     def __init__(self):
         self.generate_trackback = format_traceback_info()
     def GetType(self):
         return type(self)
+    @virtual
     def SymbolName(self) -> str:
         return self.GetType().__name__
+    @virtual
     def ToString(self) -> str:
         return str(self.GetType())
     def AsRef[_T](self, typen:Typen[_T]) -> _T:
@@ -148,8 +158,10 @@ class type_class(ABC):
     def AsIam[_T](self, typen:Typen[_T], action:Action[_T]) -> Self:
         action(self.AsRef(typen))
         return self
+    @virtual
     def __enter__(self) -> Self:
         return self
+    @virtual
     def __exit__(
         self,
         exc_type:   Optional[type],

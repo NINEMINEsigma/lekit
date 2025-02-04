@@ -13,6 +13,8 @@ from pydantic                               import BaseModel, Field
 
 from lekit.LLM.LangChain.AbsInterface   import *
 
+import random
+
 # Make Defined
 
 def do_make_content(**kwargs) -> MessageObject:
@@ -56,7 +58,12 @@ class light_llama_core(left_value_reference[ChatLlamaCpp], abs_llm_core):
             else:
                 init_message = [init_message]
         if isinstance(model, ChatLlamaCpp) is False:
-            model = ChatLlamaCpp(model_path=UnWrapper(model), temperature=temperature, *args, **kwargs)
+            model = ChatLlamaCpp(
+                model_path=UnWrapper(model),
+                temperature=temperature, 
+                seed=random.randint(),
+                *args, 
+                **kwargs)
         super().__init__(model)
         self.init_message_list      :List[MessageObject]    = init_message
         self.hestroy_message_list   :List[MessageObject]    = self.init_message_list.copy()

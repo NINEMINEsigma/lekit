@@ -1,4 +1,4 @@
-from abc                                    import *
+from lekit.Internal                         import *
 from typing                                 import *
 from langchain_core.language_models.base    import BaseMessage
 
@@ -22,21 +22,21 @@ MessageType = Literal[
 
 # Abstract part Definition
 
-class abs_llm_callable(Callable[[Union[str, MessageObject]], BaseMessage], ABC):
-    @abstractmethod
+class abs_llm_callable:
+    @virtual
     def __call__(self, message:str) -> BaseMessage:
         return None
     
     def invoke(self, message:str) -> BaseMessage:
         return self(message)
 
-class abs_llm_core(abs_llm_callable, ABC):
-    @abstractmethod
+class abs_llm_core(abs_llm_callable):
+    @virtual
     def save_hestroy(self, file:Union[tool_file, str]):
-        pass
-    @abstractmethod
+        raise NotImplementedError()
+    @virtual
     def load_hestory(self, file:Union[tool_file, str]):
-        pass
+        raise NotImplementedError()
     
 
 

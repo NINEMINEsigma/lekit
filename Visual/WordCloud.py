@@ -1,4 +1,4 @@
-from typing import *
+from lekit.Internal import *
 from pyecharts.charts import WordCloud
 from pyecharts import options as opts
 from pyecharts import types
@@ -27,26 +27,26 @@ def render_to(
 ):
     wordcloud.render(UnWrapper2Str(file_name))
 
-class light_word_cloud:
+class light_word_cloud(left_value_reference[WordCloud]):
     def __init__(
         self,
         series_name:    str,
         data_pair:      types.Sequence,
         **kwargs,
     ):
-        self.wordcloud = make_word_cloud(series_name, data_pair, **kwargs)
+        super().__init__(make_word_cloud(series_name, data_pair, **kwargs))
 
     def set_title(
         self,
         title:          str
     ):
-        set_title(self.wordcloud, title)
+        set_title(self.ref_value, title)
 
     def render_to(
         self,
         file_name:      Union[tool_file, str]
     ):
-        render_to(self.wordcloud, file_name)
+        render_to(self.ref_value, file_name)
 
 if __name__ == "__main__":
     # 准备数据
