@@ -6,7 +6,7 @@ from lekit.File.Core import tool_file, UnWrapper as UnWrapper2Str
 
 def make_word_cloud(
         series_name:    str,
-        data_pair:      types.Sequence,
+        data_pair:      Sequence[Tuple[str, int]],
         **kwargs,
     ):
     wordcloud = WordCloud()

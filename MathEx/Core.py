@@ -288,12 +288,16 @@ def UnwrapperLvn2Number(value:NumberLike_or_lvNumber):
     return value
 
 def internal_max(*args):
+    if isinstance(args[0], (Sequence,Generator)):
+        return max(args[0])
     result = args[0]
     for item in args:
         if result<item:
             result = item
     return result
 def internal_min(*args):
+    if isinstance(args[0], (Sequence,Generator)):
+        return min(args[0])
     result = args[0]
     for item in args:
         if item<result:

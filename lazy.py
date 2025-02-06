@@ -14,7 +14,6 @@ def generate_empty_config_json(path:tool_file_or_str):
 
 class GlobalConfig(any_class):
     configLogging_tspace:   int         = len("Property not found")
-    print_func:             Action[str] = print
 
     def get_config_file(self):
         return self.data_dir|self.__const_config_file
@@ -136,26 +135,30 @@ class GlobalConfig(any_class):
     @property
     def log_file(self) -> tool_file:
         return self.get_log_file()
-    def Log(self, message_type:str, message:Union[str, Any]):
+    @virtual
+    def Log(self, message_type:str, message:Union[str, Any], color:str):
         str_message_type = str(message_type)
         self.configLogging_tspace = max(self.configLogging_tspace, len(str_message_type))
         what = f"{fill_str(message_type, self.configLogging_tspace, side="center")}: {Unwrapper2Str(message)}"
-        self.print_func(what)
+        print_colorful(color,what,is_reset=True)
         log = self.get_log_file()
         log.open('a')
         log.write(f"[{nowf()}]{what}\n")
         return self
-    def LogMessage(self, message:str):
-        self.Log("Message", message)
+    def LogMessage(self, message:str, color:str=ConsoleFrontColor.BLUE):
+        self.Log("Message", message, color)
         return self
     def LogWarning(self, message:str):
-        self.Log("Warning", message)
+        self.Log("Warning", message, ConsoleFrontColor.YELLOW)
         return self
     def LogError(self, message:str):
-        self.Log("Error", message)
+        self.Log("Error", message, ConsoleFrontColor.RED)
         return self
-    def LogPropertyNotFound(self, message):
-        self.Log("Property not found", message)
+    def LogPropertyNotFound(self, message, default=None):
+        if default is None:
+            self.Log("Property not found", message, ConsoleFrontColor.YELLOW)
+        else:
+            self.Log("Property not found", f"{message}(default = {default})", ConsoleFrontColor.YELLOW)
         return self
     def LogMessageOfPleaseCompleteConfiguration(self):
         self.LogError("Please complete configuration")
@@ -165,12 +168,12 @@ class GlobalConfig(any_class):
         self.get_log_file().remove()
         return self
 
-    def FindItem(self, key:str):
+    def FindItem(self, key:str, default=None):
         if key in self.__data_pair:
             return self.__data_pair[key]
         else:
-            self.LogPropertyNotFound(key)
-            return None
+            self.LogPropertyNotFound(key, default)
+            return default
 
 class ProjectConfig(GlobalConfig):
     def __init__(self, load=True):

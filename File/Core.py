@@ -200,7 +200,7 @@ class tool_file(any_class):
             self.load_as_excel()
         elif suffix == 'txt':
             self.load_as_text()
-        elif suffix == 'docx':
+        elif suffix == 'docx' or suffix == 'doc':
             self.load_as_docx()
         elif suffix in audio_file_type:
             self.load_as_audio()
